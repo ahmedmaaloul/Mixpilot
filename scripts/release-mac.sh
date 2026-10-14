@@ -97,5 +97,9 @@ echo "▸ Checking that Gatekeeper accepts it"
 spctl --assess --type open --context context:primary-signature --verbose "$DMG"
 spctl --assess --type execute --verbose "$APP"
 
+# The website serves the latest version at /download/Mixpilot.dmg.
+mkdir -p website/public/download
+cp "$DMG" website/public/download/Mixpilot.dmg
+python3 website/build.py >/dev/null
 echo "✓ Ready to publish: $DMG"
-echo "  Upload it to mixpilot.blitzraum.com (Vercel) as the download."
+echo "  Copied to website/public/download/Mixpilot.dmg; deploy the website to publish it.

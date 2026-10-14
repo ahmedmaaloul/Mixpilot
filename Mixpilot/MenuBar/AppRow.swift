@@ -125,6 +125,7 @@ private struct MuteToggle: View {
 /// Chooses the app's output device. The button shows the device in use; it takes the accent
 /// color when the app was sent somewhere else than the system setting.
 private struct OutputMenu: View {
+    @Environment(\.routedTint) private var routedTint
     let devices: [OutputDevice]
     let settings: AppAudioSettings
     let deviceInUse: OutputDevice?
@@ -161,7 +162,7 @@ private struct OutputMenu: View {
         .menuStyle(.button)
         .buttonStyle(.borderless)
         .menuIndicator(.hidden)
-        .tint(settings.outputDeviceUID == nil ? .secondary : .accentColor)
+        .tint(settings.outputDeviceUID == nil ? Color.secondary : routedTint)
         .fixedSize()
         .accessibilityValue(Text(deviceInUse?.name ?? ""))
         .help(Text("Output: \(deviceInUse?.name ?? "")"))
@@ -213,4 +214,10 @@ extension OutputDevice.Kind {
         case .virtual: "waveform"
         }
     }
+}
+
+extension EnvironmentValues {
+    /// The color of the output button for an app sent to another device: the accent color, which
+    /// snapshots replace with the default blue.
+    @Entry var routedTint: Color = .accentColor
 }

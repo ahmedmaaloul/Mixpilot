@@ -6,7 +6,9 @@ cd "$(dirname "$0")/.."
 OUT="${1:-build/snapshots}"
 APP="$(scripts/build.sh | tail -1)"
 mkdir -p "$OUT"
+# Through Launch Services (`open`), so Mixpilot is the active app (controls draw active) and macOS
+# checks its own permissions rather than the terminal's. A few windows flash on screen meanwhile.
 for LANG_CODE in en de; do
-  "$APP/Contents/MacOS/Mixpilot" -MixpilotSnapshots "$(cd "$OUT" && pwd)" -AppleLanguages "($LANG_CODE)"
+  open -W -n "$APP" --args -MixpilotSnapshots "$(cd "$OUT" && pwd)" -AppleLanguages "($LANG_CODE)"
 done
 ls "$OUT"

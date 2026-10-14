@@ -34,6 +34,11 @@ enum SnapshotRenderer {
         guard let index = arguments.firstIndex(of: "-MixpilotSnapshots"), index + 1 < arguments.count else {
             return false
         }
+        // A menu bar agent isn't activated by macOS; as a regular app it is, and switches then draw
+        // in their active (filled) look.
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         let folder = URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let language = Bundle.main.preferredLocalizations.first ?? "en"
@@ -50,33 +55,54 @@ enum SnapshotRenderer {
 
     @MainActor
     private static func render(_ view: AnyView, appearance: NSAppearance.Name, to url: URL) {
-        let hosting = NSHostingView(rootView: view.padding(.vertical, 6))
+        // Draw controls as in the active window (macOS won't let a process started from a terminal
+        // become the active app), in the default blue accent rather than this Mac's, so pictures for
+        // the website and README look like a fresh Mac.
+        let hosting = NSHostingView(rootView: view
+            .padding(.vertical, 6)
+            .environment(\.controlActiveState, .key)
+            .environment(\.routedTint, Color(nsColor: .systemBlue))
+            .tint(Color(nsColor: .systemBlue)))
         let size = hosting.fittingSize
-        let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: size),
+        // A key window on screen, captured by the window server, so controls look as they do in
+        // use (switches and sliders filled with the accent color). `cacheDisplay` would draw them
+        // inactive. A process may capture its own windows without the Screen Recording permission.
+        let screen = NSScreen.main?.visibleFrame ?? .zero
+        let window = KeyWindow(
+            contentRect: NSRect(x: screen.minX + 40, y: screen.minY + 40, width: size.width, height: size.height),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
         window.appearance = NSAppearance(named: appearance)
         window.backgroundColor = .windowBackgroundColor
+        window.hasShadow = false
         window.contentView = hosting
-        hosting.frame = NSRect(origin: .zero, size: size)
-        hosting.layoutSubtreeIfNeeded()
-        // Let SwiftUI finish its first render pass (images, deferred layout).
-        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+        // Let SwiftUI and AppKit finish rendering (images, deferred layout, key appearance).
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
 
-        guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else { return }
-        // Draw the background first so the PNG isn't transparent.
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-        window.appearance?.performAsCurrentDrawingAppearance {
-            NSColor.windowBackgroundColor.setFill()
-            hosting.bounds.fill()
+        if let image = captureWindow(CGWindowID(window.windowNumber)) {
+            try? NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])?.write(to: url)
         }
-        NSGraphicsContext.restoreGraphicsState()
-        hosting.cacheDisplay(in: hosting.bounds, to: rep)
-        try? rep.representation(using: .png, properties: [:])?.write(to: url)
+        window.orderOut(nil)
+    }
+
+    /// `CGWindowListCreateImage` is unavailable in the macOS 15+ SDK but still captures a process's
+    /// own windows; looked up at runtime for this debug tool only.
+    private static func captureWindow(_ windowID: CGWindowID) -> CGImage? {
+        typealias CreateImage = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
+        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage") else { return nil }
+        let createImage = unsafeBitCast(symbol, to: CreateImage.self)
+        let includingWindow: UInt32 = 1 << 3
+        let ignoreFramingAndBestResolution: UInt32 = (1 << 0) | (1 << 3)
+        return createImage(.null, includingWindow, windowID, ignoreFramingAndBestResolution)?.takeRetainedValue()
+    }
+
+    private final class KeyWindow: NSWindow {
+        override var canBecomeKey: Bool { true }
+        override var canBecomeMain: Bool { true }
     }
 }
 #endif
