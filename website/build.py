@@ -27,6 +27,7 @@ TEXT = {
         "download": "Download",
         "download_mac": "Download for Mac",
         "requirements": f"Version {VERSION} · macOS 14.4 or later · Free",
+        "install_hint": "Open the disk image and drag Mixpilot into the Applications folder.",
         "hero_title": "Every app.<br>Its own volume.",
         "hero_text": "Mixpilot puts a volume slider for each app in your menu bar, and turns everything else down when a call starts.",
         "panel_call_alt": "The Mixpilot panel during a FaceTime call: Call Mode is on, FaceTime plays at full volume, Music, Podcasts and Safari are lowered, and FaceTime is using the microphone.",
@@ -105,6 +106,7 @@ TEXT = {
         "download": "Laden",
         "download_mac": "Für Mac laden",
         "requirements": f"Version {VERSION} · macOS 14.4 oder neuer · Kostenlos",
+        "install_hint": "Öffne das Disk-Image und zieh Mixpilot in den Ordner „Programme“.",
         "hero_title": "Jede App.<br>Ihre eigene Lautstärke.",
         "hero_text": "Mixpilot gibt jeder App einen eigenen Lautstärkeregler in der Menüleiste und macht alles andere leiser, sobald ein Anruf beginnt.",
         "panel_call_alt": "Das Mixpilot-Fenster während eines FaceTime-Anrufs: Der Anrufmodus ist ein, FaceTime spielt mit voller Lautstärke, Musik, Podcasts und Safari sind leiser, und FaceTime verwendet das Mikrofon.",
@@ -283,7 +285,7 @@ def index(lang):
       <h1>{t["hero_title"]}</h1>
       <p class="lead">{html.escape(t["hero_text"])}</p>
       <p><a class="pill" href="/download/Mixpilot.dmg">{t["download_mac"]}</a></p>
-      <p class="fine">{t["requirements"]}</p>
+      <p class="fine">{t["requirements"]}<br>{html.escape(t["install_hint"])}</p>
     </div>
     <div class="stage">
       {screenshot("panel-call", lang, t["panel_call_alt"])}
@@ -331,7 +333,7 @@ def index(lang):
       <img class="app-icon" src="/assets/icon-256.png" width="96" height="96" alt="">
       <h2>{t["cta_title"]}</h2>
       <p><a class="pill" href="/download/Mixpilot.dmg">{t["download_mac"]}</a></p>
-      <p class="fine">{html.escape(t["cta_text"])}</p>
+      <p class="fine">{html.escape(t["install_hint"])}<br>{html.escape(t["cta_text"])}</p>
     </div>
   </section>
 </main>

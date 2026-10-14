@@ -74,12 +74,23 @@ SIGNATURE="$(codesign -dv "$APP" 2>&1)"
 [[ "$SIGNATURE" == *"(runtime)"* ]] || { echo "Hardened runtime missing" >&2; exit 1; }
 
 echo "▸ Creating the disk image"
+# The window shows Mixpilot, an arrow and the Applications folder on an indigo background with
+# "Drag Mixpilot into Applications" (scripts/dmg: background, layout recorded by make-layout.sh).
 STAGING="$OUT/dmg"
-mkdir -p "$STAGING"
+mkdir -p "$STAGING/.background"
 cp -R "$APP" "$STAGING/"
 ln -s /Applications "$STAGING/Applications"
-hdiutil create -volname "Mixpilot" -srcfolder "$STAGING" -ov -format UDZO -quiet "$DMG"
-rm -rf "$STAGING"
+cp scripts/dmg/background.tiff "$STAGING/.background/background.tiff"
+cp scripts/dmg/DS_Store "$STAGING/.DS_Store"
+cp "$APP/Contents/Resources/AppIcon.icns" "$STAGING/.VolumeIcon.icns"
+hdiutil create -srcfolder "$STAGING" -volname Mixpilot -fs HFS+ -format UDRW -ov -quiet "$OUT/rw.dmg"
+# The disk shows Mixpilot's icon: mark the volume as having a custom icon. Mounted without Finder
+# (-nobrowse) so it doesn't rewrite the layout.
+MOUNT="$(hdiutil attach -readwrite -noverify -noautoopen -nobrowse "$OUT/rw.dmg" 2>/dev/null | awk -F'\t' '/\/Volumes\// {print $NF}')"
+xcrun SetFile -a C "$MOUNT"
+hdiutil detach "$MOUNT" -quiet
+hdiutil convert "$OUT/rw.dmg" -format UDZO -imagekey zlib-level=9 -ov -quiet -o "$DMG"
+rm -rf "$STAGING" "$OUT/rw.dmg"
 
 if [[ $TEST == true ]]; then
   echo "✓ Test build: $DMG (development signature, not notarized)"

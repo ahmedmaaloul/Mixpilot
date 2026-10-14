@@ -334,7 +334,15 @@ Snapshot rendering pitfalls (for pictures that look like a Mac in use):
 
 `scripts/release-mac.sh` (like Handpilot's): localize + package tests → archive → export
 developer-id → hardened-runtime check → DMG → sign → notarize (`--keychain-profile handpilot`) →
-staple → `spctl`. `--test` runs everything locally with the development certificate and no
+staple → `spctl` → copy to `website/public/download/Mixpilot.dmg` (push to publish).
+
+**Installer window** (`scripts/dmg/`): an indigo background with "Drag Mixpilot into Applications"
+(German line below) and an arrow, Mixpilot at (170, 200), Applications at (470, 200), 128 pt icons,
+no toolbar, 640×400; the disk has Mixpilot's icon (`.VolumeIcon.icns` + `SetFile -a C`).
+`make-background.swift` draws `background.tiff` (@1x + @2x; labels stay readable in light and dark
+mode on the mid indigo). `make-layout.sh <app>` records the Finder layout once into `DS_Store`
+(needs Finder automation and no other volume named "Mixpilot" mounted); releases copy it, so they
+don't need Finder. Rerun it only when the window design changes. `--test` runs everything locally with the development certificate and no
 notarization (verified). Bump `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` in `Config/Base.xcconfig`
 first. Download: mixpilot.blitzraum.com (Vercel). Support: support@blitzraum.com.
 

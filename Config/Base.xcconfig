@@ -11,7 +11,7 @@ DEVELOPMENT_TEAM = NSRXRUC9KF
 
 // Shown to users, and the build number, which must go up with every release.
 MARKETING_VERSION = 0.1.0
-CURRENT_PROJECT_VERSION = 1
+CURRENT_PROJECT_VERSION = 2
 
 // Without a team, sign ad hoc; with a team, use the Apple Development certificate.
 // A stable signature matters: macOS ties the System Audio Recording permission to it,
