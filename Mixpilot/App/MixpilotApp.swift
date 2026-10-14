@@ -22,18 +22,7 @@ struct MixpilotApp: App {
         Settings {
             SettingsView(model: appDelegate.model, loginItem: appDelegate.loginItem)
         }
-
-        Window("Welcome to Mixpilot", id: WindowID.onboarding) {
-            OnboardingView(loginItem: appDelegate.loginItem)
-        }
-        .windowResizability(.contentSize)
-        .windowStyle(.hiddenTitleBar)
-        .defaultPosition(.center)
     }
-}
-
-enum WindowID {
-    static let onboarding = "onboarding"
 }
 
 /// Owns the model so it exists from launch, before the panel is ever opened, and makes sure every
@@ -41,6 +30,7 @@ enum WindowID {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = MixerModel()
     let loginItem = LoginItem()
+    private let onboarding = OnboardingWindow()
     private var signalSources: [DispatchSourceSignal] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -56,6 +46,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         model.installDebugHooks()
         #endif
+        if OnboardingWindow.isNeeded {
+            onboarding.show(loginItem: loginItem)
+        }
     }
 
     /// Opening Mixpilot while it runs (Finder, Spotlight, Launchpad) shows Settings: the way back

@@ -250,6 +250,7 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
   synthetic click on the `NSStatusBarButton` does nothing), and computer use can't target a debug
   build. Check the live panel by hand.
 - Commit and push each finished step; commits use the GitHub noreply address (set in this repo).
+  **All credit goes to the user: no `Co-Authored-By` trailers, no "Generated with" lines in PRs.**
 - No third-party dependencies beyond KeyboardShortcuts without asking the user.
 
 ## App shell (M5)
@@ -262,8 +263,12 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
   `applicationShouldHandleReopen` opens Settings, so a hidden icon is never a dead end.
 - **Open at Login**: `SMAppService.mainApp` (`LoginItem`), with "Open System Settings" when macOS
   wants approval.
-- **Onboarding**: `Window` scene, opened from `MenuBarIcon.task` while `hasCompletedOnboarding` is
-  false. Permission step: `AudioPermission.request()` starts an unmuted global tap with a silent
+- **Onboarding**: `OnboardingWindow`, an AppKit window hosting `OnboardingView`, opened by the app
+  delegate at launch while `hasCompletedOnboarding` is false (closing it in any way sets it). Not a
+  SwiftUI `Window` scene: a menu bar extra's label doesn't run `.task` on macOS 27, so nothing could
+  open it. Fixed size from the first step's `fittingSize` with `NSHostingView.sizingOptions = []`:
+  letting SwiftUI size the window (`preferredContentSize`) loops on macOS 27 until AppKit throws
+  ("needs another Update Constraints in Window pass"). Permission step: `AudioPermission.request()` starts an unmuted global tap with a silent
   IOProc (nothing anyone hears changes) to make macOS ask, then polls `AudioPermission.isGranted()`.
 - **Shortcuts** (KeyboardShortcuts names in `Shortcuts.swift`): none set by default. Microphone and
   call mode toggle on key up; volume up/down of the frontmost app in 10 % steps on key down, capped at

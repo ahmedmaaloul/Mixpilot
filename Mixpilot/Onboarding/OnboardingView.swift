@@ -1,12 +1,57 @@
+import AppKit
 import MixpilotAudio
 import SwiftUI
+
+/// Shows the welcome window the first time Mixpilot runs. An AppKit window hosting SwiftUI, so the
+/// app delegate can open it at launch (a menu bar extra's label doesn't run SwiftUI tasks).
+final class OnboardingWindow: NSObject, NSWindowDelegate {
+    static let completedKey = "hasCompletedOnboarding"
+    private var window: NSWindow?
+
+    static var isNeeded: Bool {
+        !UserDefaults.standard.bool(forKey: completedKey)
+    }
+
+    func show(loginItem: LoginItem) {
+        if window == nil {
+            let hosting = NSHostingView(rootView: OnboardingView(loginItem: loginItem) { [weak self] in
+                self?.window?.close()
+            })
+            // A fixed size, measured once on the first (tallest) step. Letting SwiftUI resize the
+            // window as it lays out loops on macOS 27 until AppKit throws.
+            hosting.sizingOptions = []
+            let window = NSWindow(
+                contentRect: NSRect(origin: .zero, size: hosting.fittingSize),
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            window.contentView = hosting
+            window.title = String(localized: "Welcome to Mixpilot")
+            window.isReleasedWhenClosed = false
+            window.delegate = self
+            window.center()
+            self.window = window
+        }
+        NSApp.activate()
+        window?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Closing the window, with Done or the close button, means "seen": it doesn't come back.
+    /// The permission prompt still appears the first time an app's volume is changed.
+    func windowWillClose(_ notification: Notification) {
+        UserDefaults.standard.set(true, forKey: Self.completedKey)
+        window = nil
+    }
+}
+
 
 /// The first-launch window: what Mixpilot does, the System Audio Recording permission in plain
 /// words, and Open at Login. Three short steps, each with one clear action.
 struct OnboardingView: View {
     let loginItem: LoginItem
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    @Environment(\.dismissWindow) private var dismissWindow
+    /// Closes the window.
+    var onDone: @MainActor () -> Void = {}
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var step = Step.welcome
     @State private var permission = PermissionState.unknown
@@ -35,9 +80,10 @@ struct OnboardingView: View {
             .transition(.opacity)
         }
         .padding(.horizontal, 40)
-        .padding(.top, 36)
+        .padding(.top, 24)
         .padding(.bottom, 24)
         .frame(width: 480)
+        .frame(maxHeight: .infinity, alignment: .top)
         .animation(reduceMotion ? nil : .default, value: step)
         .task {
             if await isGranted() {
@@ -160,8 +206,7 @@ struct OnboardingView: View {
 
             buttons {
                 Button("Done") {
-                    hasCompletedOnboarding = true
-                    dismissWindow()
+                    onDone()
                 }
                 .keyboardShortcut(.defaultAction)
             }
@@ -172,11 +217,14 @@ struct OnboardingView: View {
 
     /// Buttons on the trailing edge, default action last, like a sheet.
     private func buttons(@ViewBuilder _ content: () -> some View) -> some View {
-        HStack {
-            Spacer()
-            content()
+        VStack {
+            Spacer(minLength: 0)
+            HStack {
+                Spacer()
+                content()
+            }
+            .padding(.top, 4)
         }
-        .padding(.top, 4)
     }
 
     private func ask() {
