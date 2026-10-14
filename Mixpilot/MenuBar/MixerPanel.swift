@@ -12,10 +12,13 @@ struct MixerPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             PanelHeader()
+            if model.needsAudioPermission {
+                PermissionNotice()
+            }
             if model.apps.isEmpty {
                 NoAppsView()
             } else {
-                AppList(apps: model.apps)
+                AppList(model: model)
             }
         }
         .frame(width: PanelMetrics.width)
@@ -70,13 +73,17 @@ private struct MoreMenu: View {
 }
 
 private struct AppList: View {
-    let apps: [AppRowState]
+    let model: MixerModel
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(apps) { app in
-                    AppRow(app: app)
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(model.apps) { app in
+                    AppRow(
+                        app: app,
+                        onVolumeChange: { model.setVolume($0, for: app.id) },
+                        onMuteChange: { model.setMuted($0, for: app.id) }
+                    )
                 }
             }
             .padding(.horizontal, PanelMetrics.horizontalPadding)
@@ -87,6 +94,27 @@ private struct AppList: View {
         // As tall as the rows, up to about a dozen of them; scrolls beyond that.
         .frame(maxHeight: 480)
         .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Shown when macOS doesn't let Mixpilot hear apps. Apps keep playing normally meanwhile.
+private struct PermissionNotice: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("To change the volume of apps, allow Mixpilot to record system audio.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Open System Settings") {
+                // Privacy & Security ▸ Screen & System Audio Recording.
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            .controlSize(.small)
+        }
+        .padding(.horizontal, PanelMetrics.horizontalPadding)
+        .padding(.vertical, 6)
     }
 }
 
@@ -121,6 +149,10 @@ private struct NoAppsView: View {
     MixerPanel(model: .preview())
         .environment(\.locale, Locale(identifier: "de"))
         .preferredColorScheme(.dark)
+}
+
+#Preview("Permission Needed") {
+    MixerPanel(model: MixerModel(previewApps: PreviewData.apps, needsAudioPermission: true))
 }
 
 #Preview("No Apps") {

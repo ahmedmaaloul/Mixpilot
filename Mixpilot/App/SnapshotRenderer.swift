@@ -16,6 +16,7 @@ enum SnapshotRenderer {
         [
             ("panel-apps", AnyView(MixerPanel(model: .preview()))),
             ("panel-empty", AnyView(MixerPanel(model: .preview([])))),
+            ("panel-permission", AnyView(MixerPanel(model: MixerModel(previewApps: PreviewData.apps, needsAudioPermission: true)))),
         ]
     }
 

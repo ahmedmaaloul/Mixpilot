@@ -49,6 +49,9 @@ public enum AppGrouper {
             app.processObjectIDs.sort()
             app.isPlaying = app.isPlaying || process.isRunningOutput
             app.isUsingMicrophone = app.isUsingMicrophone || process.isRunningInput
+            for device in process.outputDeviceIDs where !app.outputDeviceIDs.contains(device) {
+                app.outputDeviceIDs.append(device)
+            }
             apps[id] = app
         }
         return apps.values.sorted { $0.id < $1.id }

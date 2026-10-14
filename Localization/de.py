@@ -10,6 +10,12 @@ DE = {
     "About Mixpilot": "Über Mixpilot",
     "Apps appear here when they play sound.": "Apps werden hier angezeigt, wenn sie Ton wiedergeben.",
     "More": "Mehr",
+    "Mute": "Ton aus",
+    "Open System Settings": "Systemeinstellungen öffnen",
+    "To change the volume of apps, allow Mixpilot to record system audio.":
+        "Erlaube Mixpilot die Systemaudioaufnahme, damit du die Lautstärke von Apps ändern kannst.",
+    "Unmute": "Ton ein",
+    "Volume": "Lautstärke",
     "No Apps Playing Sound": "Keine App gibt Ton wieder",
     "Quit Mixpilot": "Mixpilot beenden",
     "Unknown App": "Unbekannte App",

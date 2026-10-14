@@ -17,6 +17,8 @@ public struct AudioProcess: Sendable, Hashable, Identifiable {
     public var parentPID: Int32?
     /// The process macOS holds responsible for this one (XPC services → the app that uses them).
     public var responsiblePID: Int32?
+    /// Output devices the process is playing to (`AudioObjectID`s), usually one.
+    public var outputDeviceIDs: [UInt32]
 
     public init(
         id: UInt32,
@@ -25,7 +27,8 @@ public struct AudioProcess: Sendable, Hashable, Identifiable {
         isRunningOutput: Bool,
         isRunningInput: Bool,
         parentPID: Int32? = nil,
-        responsiblePID: Int32? = nil
+        responsiblePID: Int32? = nil,
+        outputDeviceIDs: [UInt32] = []
     ) {
         self.id = id
         self.pid = pid
@@ -34,6 +37,7 @@ public struct AudioProcess: Sendable, Hashable, Identifiable {
         self.isRunningInput = isRunningInput
         self.parentPID = parentPID
         self.responsiblePID = responsiblePID
+        self.outputDeviceIDs = outputDeviceIDs
     }
 }
 
@@ -61,6 +65,8 @@ public struct AudioApp: Sendable, Hashable, Identifiable {
     public var isPlaying: Bool
     /// At least one of its processes is using a microphone.
     public var isUsingMicrophone: Bool
+    /// Output devices its processes play to, in order of appearance, without duplicates.
+    public var outputDeviceIDs: [UInt32]
 
     public init(
         id: String,
@@ -68,7 +74,8 @@ public struct AudioApp: Sendable, Hashable, Identifiable {
         pids: [Int32],
         processObjectIDs: [UInt32],
         isPlaying: Bool,
-        isUsingMicrophone: Bool
+        isUsingMicrophone: Bool,
+        outputDeviceIDs: [UInt32] = []
     ) {
         self.id = id
         self.bundleID = bundleID
@@ -76,5 +83,6 @@ public struct AudioApp: Sendable, Hashable, Identifiable {
         self.processObjectIDs = processObjectIDs
         self.isPlaying = isPlaying
         self.isUsingMicrophone = isUsingMicrophone
+        self.outputDeviceIDs = outputDeviceIDs
     }
 }

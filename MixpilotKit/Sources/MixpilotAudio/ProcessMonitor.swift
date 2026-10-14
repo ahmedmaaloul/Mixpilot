@@ -126,7 +126,8 @@ public final class ProcessMonitor: @unchecked Sendable {
                 isRunningOutput: HAL.flag(object, kAudioProcessPropertyIsRunningOutput) ?? false,
                 isRunningInput: HAL.flag(object, kAudioProcessPropertyIsRunningInput) ?? false,
                 parentPID: identity.parentPID,
-                responsiblePID: identity.responsiblePID
+                responsiblePID: identity.responsiblePID,
+                outputDeviceIDs: HAL.objectIDs(object, kAudioProcessPropertyDevices, scope: kAudioObjectPropertyScopeOutput)
             )
         }
         continuation.yield(snapshot)

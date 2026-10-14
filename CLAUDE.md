@@ -17,11 +17,16 @@ Mixpilot/                    App target (UI and wiring only), folder-synchronize
   MenuBar/                   MixerPanel (the window-style menu bar extra), AppRow, MenuBarIcon
   Resources/                 Localizable.xcstrings, InfoPlist.xcstrings, AppIcon.icon
 MixpilotKit/                 Swift package, no UI
-  Sources/MixpilotCore/      Pure logic, fully tested: AppGrouper, models, settings store, call detector
-  Sources/MixpilotAudio/     Core Audio HAL: AudioObject helpers, ProcessMonitor, Responsibility (private SPI)
-  Tests/MixpilotCoreTests/   Swift Testing
+  Sources/MixpilotCore/      Pure logic, fully tested: AppGrouper, Linger, AppVolume, TapPlanner
+                             (later: settings store, call detector)
+  Sources/MixpilotRender/    C: the audio thread's code (MPRenderIOProc, gain ramp, soft limiter)
+  Sources/MixpilotAudio/     Core Audio HAL: HAL helpers, ProcessMonitor, Responsibility (private SPI),
+                             AudioDevices, TapSession, TapManager
+  Tests/MixpilotCoreTests/   Swift Testing: grouping, linger, tap planning
+  Tests/MixpilotRenderTests/ Swift Testing against the C kernel with synthetic buffers
 Localization/                de.py (German table, source of truth) + localize.py (sync + fill + check)
-scripts/                     build/run helpers, preview snapshots, release-mac.sh (M5)
+scripts/                     build.sh, run.sh, snapshots.sh, debug-volume.swift (set an app's volume in
+                             a debug build without the panel), release-mac.sh (M5)
 ```
 
 The `.xcodeproj` uses folder-synchronized groups: any file under `Mixpilot/` is in the target
@@ -34,8 +39,8 @@ Core Audio HAL ── listeners (process list, per process IsRunning + Devices) 
    ▼
 ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → owning app) ──► MixerModel (@MainActor)
                                                                                  │
-                         (M2+) TapManager ◄── effective gain = volume × mute × duck
-                                 ▼
+                                 TapManager ◄── TapRequest per app: gain = volume × mute (× duck, M4)
+                                 ▼          (own queue; decisions from TapPlanner, pure + tested)
           TapSession = private process tap (.mutedWhenTapped) + private aggregate device + C IOProc
 ```
 
@@ -52,8 +57,27 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
   4. its bundle ID starts with a running app's bundle ID + "." (`net.whatsapp.WhatsApp.ServiceExtension`).
   Processes without an owning app (daemons) are hidden. Mixpilot hides itself.
 - **Rows linger** 3 s after an app stops playing so the list doesn't jump; order is alphabetical.
-- **Apps you haven't touched are never tapped** (M2): no added latency, no risk.
-- **Fail open** (M2): on any error, destroy the tap; `.mutedWhenTapped` then gives the app its sound back.
+- **Apps you haven't touched are never tapped**: no added latency, no risk. A session exists while
+  the app's gain ≠ 1, plus 3 s after it returns to 1 (`TapPlanner.unityGrace`) so dragging through
+  100 % doesn't rebuild it.
+- **TapSession**: `CATapDescription(stereoMixdownOfProcesses:)` over all the app's process objects,
+  private, `.mutedWhenTapped`; private aggregate device (main sub-device = the device the app plays to,
+  tap with drift compensation); wait until its streams exist; `AudioDeviceCreateIOProcID` with the C
+  `MPRenderIOProc` and an opaque `MPRenderState*` (C11 atomics: target gain, signal flag, callback
+  count). Teardown order: stop → destroy IOProc → destroy aggregate → destroy tap → free state.
+- **IO follows the app's stream**: audio runs only while the app has an open output stream
+  (`start`/`stop` actions), so Mixpilot never keeps a device (AirPods) streaming silence.
+  New helper processes are added by rewriting `kAudioTapPropertyDescription` (no gap).
+- **Output device**: the device the app plays to (`kAudioProcessPropertyDevices`, output scope), else
+  the system default. If it changes (headphones, default switched), the session is rebuilt there.
+- **Fail open**: on any error the session is destroyed and the app is blocked for 10 s;
+  `.mutedWhenTapped` then gives the app its sound back. Permission: 2 s after a start with only
+  silence, rewrite the tap description; `kAudioDevicePermissionsError` → release everything, show the
+  notice, probe every 3 s with an unmuted, unread global tap until granted.
+- **Quitting**: `applicationWillTerminate` and SIGTERM/SIGINT/SIGHUP (dispatch signal sources) call
+  `TapManager.stopAll()` (synchronous). A crash or `kill -9` needs nothing: private taps and aggregate
+  devices vanish with the process (verified). `TapManager.removeLeftovers()` at launch removes any
+  non-private objects named/UID'd as Mixpilot's.
 
 ## Design rules (from the brief; these are requirements)
 
@@ -109,18 +133,30 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
 - The responsible-PID SPI exists on macOS 27 and maps `com.apple.WebKit.GPU` → Mail/Safari; Chrome
   and Electron helpers also have the app as parent.
 - macOS 26 added `CATapDescription.bundleIDs` and `processRestoreEnabled` (not usable on 14.4).
+- The first tap start shows the System Audio Recording prompt (~2 s until the user answers). After
+  that, creating a session and starting it takes ~50–90 ms.
+- When an app reopens its stream after a long pause, its first ~100 ms play at its own level until
+  `start` runs (`.mutedWhenTapped` only mutes while read). Accepted for fail-open safety; `.muted`
+  would avoid it but could leave an app silent if Mixpilot stalls.
+- Privacy pane URL: `x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture`
+  opens "Screen & System Audio Recording" (Mixpilot is under "System Audio Recording Only").
+- Swift: `AudioBufferList.allocate(maximumBuffers: 0)` traps; allocate 1 and set `count = 0`.
 
 ## Build, run, test
 
 - Xcode 27 (Swift 6.4). Deployment target macOS 14.4. This Mac runs macOS 27 only: older-OS
   fallbacks need a VM to verify.
-- Package tests: `cd MixpilotKit && swift test`
+- Tests: `cd MixpilotKit && swift test` (all logic and the C kernel live in the package; Xcode
+  doesn't run a project's local-package tests from the app scheme — open `MixpilotKit/` in Xcode instead).
 - App: `xcodebuild -project Mixpilot.xcodeproj -scheme Mixpilot -derivedDataPath build/DerivedData -allowProvisioningUpdates build`
   then `open build/DerivedData/Build/Products/Debug/Mixpilot.app` (or `scripts/run.sh`).
 - Signing: team `NSRXRUC9KF`, automatic, in `Config/Base.xcconfig`. A stable signature keeps the
   System Audio Recording permission across rebuilds.
 - Test German: `scripts/run.sh -AppleLanguages "(de)"`.
-- Logs: `log stream --predicate 'subsystem == "app.mixpilot.mac"'`.
+- Logs: `log stream --level info --predicate 'subsystem == "app.mixpilot.mac"'` (category `taps`
+  shows every session created, paused, resumed, released).
+- Without the panel (debug build): `swiftc -O scripts/debug-volume.swift -o build/debug-volume`, then
+  `build/debug-volume com.apple.QuickTimePlayerX 0.3` (or `mute` / `unmute`).
 
 ## Conventions
 
@@ -153,7 +189,7 @@ Like Handpilot's `scripts/release-mac.sh`: archive → export developer-id → D
 ## Milestones
 
 1. ✅ List apps producing audio, live updating, in a native menu bar panel.
-2. Per-app volume and mute with process taps, clean teardown.
+2. ✅ Per-app volume and mute with process taps, clean teardown.
 3. Boost above 100 %, per-app output device, saved settings.
 4. Call detection and automatic lowering, microphone section.
 5. Shortcuts, launch at login, settings window, onboarding, full English and German, app icon.
