@@ -12,7 +12,7 @@ struct MixpilotApp: App {
         MenuBarExtra {
             MixerPanel(model: appDelegate.model)
         } label: {
-            MenuBarIcon()
+            MenuBarIcon(model: appDelegate.model)
         }
         .menuBarExtraStyle(.window)
     }
@@ -28,8 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if DEBUG
         if SnapshotRenderer.runIfRequested() { return }
         #endif
-        // Objects a previous run couldn't remove (Mixpilot's own taps vanish with its process).
+        // What a previous run couldn't undo (Mixpilot's own taps vanish with its process).
         TapManager.removeLeftovers()
+        MicrophoneController.restoreLeftovers()
         handleTerminationSignals()
         model.start()
         #if DEBUG

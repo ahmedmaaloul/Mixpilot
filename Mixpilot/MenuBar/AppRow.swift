@@ -27,6 +27,11 @@ struct AppRow: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 0)
+                if let status = app.callStatus {
+                    statusText(status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 OutputMenu(
                     devices: devices,
                     settings: app.settings,
@@ -47,6 +52,13 @@ struct AppRow: View {
 
     private var percent: String {
         app.settings.volume.formatted(.percent.precision(.fractionLength(0)))
+    }
+
+    private func statusText(_ status: AppRowState.CallStatus) -> Text {
+        switch status {
+        case .inCall: Text("In Call")
+        case .lowered: Text("Lowered")
+        }
     }
 
     /// Where the app's sound comes out: the chosen device while connected, else the app's own

@@ -45,10 +45,13 @@ public struct AudioProcess: Sendable, Hashable, Identifiable {
 public struct RunningApp: Sendable, Hashable {
     public var pid: Int32
     public var bundleID: String?
+    /// No user interface at all (a daemon like `avconferenced`): never shown as a row itself.
+    public var isBackgroundOnly: Bool
 
-    public init(pid: Int32, bundleID: String?) {
+    public init(pid: Int32, bundleID: String?, isBackgroundOnly: Bool = false) {
         self.pid = pid
         self.bundleID = bundleID
+        self.isBackgroundOnly = isBackgroundOnly
     }
 }
 

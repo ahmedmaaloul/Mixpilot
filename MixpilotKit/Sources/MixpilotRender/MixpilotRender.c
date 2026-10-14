@@ -12,31 +12,49 @@ static const double kRampTimeConstant = 0.015;
 /// Mixpilot only ever makes apps quieter: the audio thread never amplifies, whatever it is told.
 static const float kMaximumGain = 1.0f;
 
+/// Call mode fades other apps down in about half a second and back up in about a second: calm,
+/// noticeable, never abrupt.
+static const double kDuckDownTimeConstant = 0.15;
+static const double kDuckUpTimeConstant = 0.35;
+
 struct MPRenderState {
     // Shared with the main thread.
     _Atomic float targetGain;
+    _Atomic float targetDuck;
     _Atomic bool hasReceivedSignal;
     _Atomic uint64_t callbackCount;
     // Audio thread only.
     float currentGain;
+    float currentDuck;
     float rampCoefficient;
+    float duckDownCoefficient;
+    float duckUpCoefficient;
 };
+
+static float coefficient(double timeConstant, double sampleRate) {
+    return (float)(1.0 - exp(-1.0 / (timeConstant * sampleRate)));
+}
 
 static float clampGain(float gain) {
     if (!(gain >= 0.0f)) return 0.0f; // also catches NaN
     return gain > kMaximumGain ? kMaximumGain : gain;
 }
 
-MPRenderState *MPRenderStateCreate(float gain, double sampleRate) {
+MPRenderState *MPRenderStateCreate(float gain, float duck, double sampleRate) {
     MPRenderState *state = calloc(1, sizeof(MPRenderState));
     if (state == NULL) return NULL;
-    float clamped = clampGain(gain);
-    atomic_init(&state->targetGain, clamped);
+    float clampedGain = clampGain(gain);
+    float clampedDuck = clampGain(duck);
+    atomic_init(&state->targetGain, clampedGain);
+    atomic_init(&state->targetDuck, clampedDuck);
     atomic_init(&state->hasReceivedSignal, false);
     atomic_init(&state->callbackCount, 0);
-    state->currentGain = clamped;
+    state->currentGain = clampedGain;
+    state->currentDuck = clampedDuck;
     double rate = sampleRate > 0 ? sampleRate : 48000.0;
-    state->rampCoefficient = (float)(1.0 - exp(-1.0 / (kRampTimeConstant * rate)));
+    state->rampCoefficient = coefficient(kRampTimeConstant, rate);
+    state->duckDownCoefficient = coefficient(kDuckDownTimeConstant, rate);
+    state->duckUpCoefficient = coefficient(kDuckUpTimeConstant, rate);
     return state;
 }
 
@@ -46,6 +64,11 @@ void MPRenderStateDestroy(MPRenderState *state) {
 
 void MPRenderSetGain(MPRenderState *state, float gain) {
     atomic_store_explicit(&state->targetGain, clampGain(gain), memory_order_relaxed);
+}
+
+void MPRenderSetDuck(MPRenderState *state, float level) {
+    float clamped = clampGain(level);
+    atomic_store_explicit(&state->targetDuck, clamped, memory_order_relaxed);
 }
 
 float MPRenderTargetGain(const MPRenderState *state) {
@@ -119,20 +142,28 @@ void MPRenderProcess(MPRenderState *state, const AudioBufferList *input, AudioBu
     if (stereoOutput && outRight.frames < frames) frames = outRight.frames;
 
     const float target = atomic_load_explicit(&state->targetGain, memory_order_relaxed);
-    const float coefficient = state->rampCoefficient;
+    const float duckTarget = atomic_load_explicit(&state->targetDuck, memory_order_relaxed);
+    const float rampCoefficient = state->rampCoefficient;
+    const float duckCoefficient = duckTarget < state->currentDuck ? state->duckDownCoefficient : state->duckUpCoefficient;
     float gain = state->currentGain;
+    float duck = state->currentDuck;
     bool sawSignal = false;
 
     for (UInt32 frame = 0; frame < frames; frame++) {
         if (gain != target) {
-            gain += (target - gain) * coefficient;
+            gain += (target - gain) * rampCoefficient;
             if (fabsf(target - gain) < 1e-5f) gain = target;
+        }
+        if (duck != duckTarget) {
+            duck += (duckTarget - duck) * duckCoefficient;
+            if (fabsf(duckTarget - duck) < 1e-5f) duck = duckTarget;
         }
         float l = left.data[frame * left.stride];
         float r = right.data[frame * right.stride];
         sawSignal = sawSignal || l != 0.0f || r != 0.0f;
-        l *= gain;
-        r *= gain;
+        const float level = gain * duck;
+        l *= level;
+        r *= level;
         if (stereoOutput) {
             outLeft.data[frame * outLeft.stride] = l;
             outRight.data[frame * outRight.stride] = r;
@@ -142,6 +173,7 @@ void MPRenderProcess(MPRenderState *state, const AudioBufferList *input, AudioBu
     }
 
     state->currentGain = gain;
+    state->currentDuck = duck;
     if (sawSignal && !atomic_load_explicit(&state->hasReceivedSignal, memory_order_relaxed)) {
         atomic_store_explicit(&state->hasReceivedSignal, true, memory_order_relaxed);
     }

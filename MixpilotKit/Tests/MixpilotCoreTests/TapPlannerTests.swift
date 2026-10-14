@@ -175,3 +175,44 @@ struct TapRoutingTests {
         #expect(TapPlanner.plan(targets: [target], sessions: ["net.whatsapp.WhatsApp": session], now: 100).isEmpty)
     }
 }
+
+@Suite("Planning taps: call mode")
+struct TapDuckTests {
+    func target(_ id: String = "com.spotify.client", gain: Double = 1, duck: Double, playing: Bool = true) -> TapTarget {
+        TapTarget(appID: id, processObjectIDs: [1], gain: gain, duck: duck, isPlaying: playing, outputDeviceUID: "Speakers")
+    }
+
+    @Test func playingAppIsTappedToBeLowered() {
+        let t = target(duck: 0.2)
+        #expect(TapPlanner.plan(targets: [t], sessions: [:], now: 0) == [.create(t)])
+    }
+
+    @Test func silentAppIsNotTappedJustForCallMode() {
+        #expect(TapPlanner.plan(targets: [target(duck: 0.2, playing: false)], sessions: [:], now: 0).isEmpty)
+    }
+
+    @Test func silentAppWithItsOwnVolumeIsTappedAhead() {
+        let t = target(gain: 0.5, duck: 0.2, playing: false)
+        #expect(TapPlanner.plan(targets: [t], sessions: [:], now: 0) == [.create(t)])
+    }
+
+    @Test func callStartLowersRunningSessions() {
+        let session = TapSessionState(processObjectIDs: [1], outputDeviceUID: "Speakers", gain: 0.5, isRunning: true)
+        let actions = TapPlanner.plan(targets: [target(gain: 0.5, duck: 0.2)], sessions: ["com.spotify.client": session], now: 0)
+        #expect(actions == [.setDuck(appID: "com.spotify.client", duck: 0.2)])
+    }
+
+    @Test func callEndKeepsTheSessionWhileItFadesBackUp() {
+        // Duck back at 1 since t=10: the grace period covers the fade.
+        let session = TapSessionState(processObjectIDs: [1], outputDeviceUID: "Speakers", gain: 1, duck: 1, isRunning: true, unitySince: 10)
+        #expect(TapPlanner.plan(targets: [target(duck: 1)], sessions: ["com.spotify.client": session], now: 11).isEmpty)
+        #expect(TapPlanner.plan(targets: [target(duck: 1)], sessions: ["com.spotify.client": session], now: 13)
+            == [.destroy(appID: "com.spotify.client")])
+    }
+
+    @Test func duckedSessionIsNotAtUnity() {
+        let session = TapSessionState(processObjectIDs: [1], outputDeviceUID: "Speakers", gain: 1, duck: 0.2, isRunning: true, unitySince: 0)
+        #expect(!session.isAtUnity)
+        #expect(TapPlanner.nextDeadline(sessions: ["a": session]) == nil)
+    }
+}

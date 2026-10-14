@@ -18,11 +18,14 @@ Mixpilot/                    App target (UI and wiring only), folder-synchronize
   Resources/                 Localizable.xcstrings, InfoPlist.xcstrings, AppIcon.icon
 MixpilotKit/                 Swift package, no UI
   Sources/MixpilotCore/      Pure logic, fully tested: AppGrouper, Linger, AppAudioSettings,
-                             AppSettingsStore, OutputDevice (+ kind), TapPlanner (later: call detector)
-  Sources/MixpilotRender/    C: the audio thread's code (MPRenderIOProc, gain ramp, gain capped at 1)
+                             AppSettingsStore, OutputDevice (+ kind), TapPlanner, CallMode + KnownCallApps
+  Sources/MixpilotRender/    C: the audio thread's code (MPRenderIOProc, gain ramp + call-mode fade,
+                             both capped at 1)
   Sources/MixpilotAudio/     Core Audio HAL: HAL helpers, ProcessMonitor, DeviceMonitor, Responsibility
-                             (private SPI), AudioDevices, TapSession (+ Output), TapManager
-  Tests/MixpilotCoreTests/   Swift Testing: grouping, linger, tap planning, settings storage, device kinds
+                             (private SPI), AudioDevices, TapSession (+ Output), TapManager,
+                             MicrophoneController
+  Tests/MixpilotCoreTests/   Swift Testing: grouping, linger, tap planning, settings storage, device kinds,
+                             call detection
   Tests/MixpilotRenderTests/ Swift Testing against the C kernel with synthetic buffers
 Localization/                de.py (German table, source of truth) + localize.py (sync + fill + check)
 scripts/                     build.sh, run.sh, snapshots.sh, debug-volume.swift (set an app's volume in
@@ -55,7 +58,10 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
      only way to map XPC services like `com.apple.WebKit.GPU` to Safari or Mail;
   3. its parent PID is a running app (Chrome/Electron helpers);
   4. its bundle ID starts with a running app's bundle ID + "." (`net.whatsapp.WhatsApp.ServiceExtension`).
-  Processes without an owning app (daemons) are hidden. Mixpilot hides itself.
+  Checked first: call daemons (`AppGrouper.daemonOwners`): `avconferenced` and `callservicesd`
+  (TelephonyUtilities) do FaceTime's and Phone's audio and belong to whichever of those runs.
+  Processes without an owning app are hidden, and so are background-only apps
+  (`activationPolicy == .prohibited`). Mixpilot hides itself.
 - **Rows linger** 3 s after an app stops playing so the list doesn't jump; order is alphabetical.
 - **Apps you haven't touched are never tapped**: no added latency, no risk. A session exists while
   the app's gain ≠ 1, plus 3 s after it returns to 1 (`TapPlanner.unityGrace`) so dragging through
@@ -84,6 +90,22 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
   "AirPods Pro (Not Connected)") per bundle ID as JSON in UserDefaults (`appAudioSettings.v1`).
   Unchanged apps and `pid:` IDs aren't stored; loading is lenient (bad values repaired or dropped).
   Settings apply as soon as the app shows up in Core Audio again.
+- **Call mode** (`CallMode`, pure): a call is detected when a known call app or browser
+  (`KnownCallApps`) uses the microphone for 1 s, and ends 5 s after none does (muting yourself
+  briefly doesn't end it). The panel switch (and the M5 shortcut) overrides detection until a call
+  starts or ends. While on, every app except the call apps and anything using the microphone gets
+  `duck = callModeLevel` (UserDefaults `callModeLevel`, default 0.2; Settings in M5). Duck is a
+  second gain stage in the C kernel with its own slow fade (τ 0.15 s down, 0.35 s up) so user volume
+  changes stay instant during a call and volumes come back exactly. Apps lowered only by call mode
+  are tapped when they play (not every app with an audio process); the 3 s grace covers the fade up.
+- **Microphone** (`MicrophoneController`): always the default input device. Mute uses the device's
+  mute switch if settable, else volume 0 with the old level saved. The mute moves with the input
+  device. It never outlives Mixpilot: restored at quit/SIGTERM (`stopAudio`); after a crash the
+  record in UserDefaults `mutedInputDevices` (UID → -1 for the switch or the saved volume) is undone
+  at the next launch (`restoreLeftovers`). Input volume = `kAudioDevicePropertyVolumeScalar`
+  (input scope, main element or channels 1–2); hidden if not settable.
+- **Menu bar icon**: `mic.slash` while the microphone is off (most important), `phone` while call
+  mode is on, else `slider.vertical.3`.
 - **Volume**: 0–100 %, where 100 % is the app's own level. **No boost, by the user's decision: Mixpilot
   only makes apps quieter, to protect hearing and speakers ("we are not Windows").** Enforced twice:
   `AppAudioSettings.volumeRange` is 0…1 (stored values above are clamped on load) and the C kernel
@@ -167,6 +189,10 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
   a notification alone, check the actual state (`isBroken`), or rebuilds loop.
 - Apple's wording for following the system output is "Use System Setting" (FaceTime's Video menu);
   German "Systemeinstellung verwenden".
+- `avconferenced` and TelephonyUtilities are listed in `NSWorkspace.runningApplications`
+  (background-only), so a plain "own PID is an app" rule would show them as rows.
+- The built-in microphone has a settable input mute (`kAudioDevicePropertyMute`, input scope, main
+  element); after `kill -9` it stays muted until Mixpilot runs again (hence launch at login, M5).
 
 ## Build, run, test
 
@@ -182,8 +208,9 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
 - Logs: `log stream --level info --predicate 'subsystem == "app.mixpilot.mac"'` (category `taps`
   shows every session created, paused, resumed, released).
 - Without the panel (debug build): `swiftc -O scripts/debug-volume.swift -o build/debug-volume`, then
-  `build/debug-volume com.apple.QuickTimePlayerX 0.3` (0…2, `mute`, `unmute`,
-  `device <UID>`, `device system`). Device UIDs: `system_profiler SPAudioDataType` doesn't show them;
+  `build/debug-volume com.apple.QuickTimePlayerX 0.3` (0…1, `mute`, `unmute`,
+  `device <UID>`, `device system`), `build/debug-volume - callmode on|off`,
+  `build/debug-volume - mic mute|unmute`. Device UIDs: `system_profiler SPAudioDataType` doesn't show them;
   the debug log shows `Tapping … on <UID>`.
 - Saved settings: `defaults read app.mixpilot.mac appAudioSettings.v1` (JSON data);
   `defaults delete app.mixpilot.mac appAudioSettings.v1` resets them.
@@ -222,5 +249,5 @@ Like Handpilot's `scripts/release-mac.sh`: archive → export developer-id → D
 2. ✅ Per-app volume and mute with process taps, clean teardown.
 3. ✅ Per-app output device, saved settings, device-change handling. (Boost above 100 % was built,
    then removed at the user's request.)
-4. Call detection and automatic lowering, microphone section.
+4. ✅ Call detection and automatic lowering, microphone section.
 5. Shortcuts, launch at login, settings window, onboarding, full English and German, app icon.

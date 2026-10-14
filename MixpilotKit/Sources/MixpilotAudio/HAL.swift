@@ -86,11 +86,12 @@ final class HALListener {
         object: AudioObjectID,
         selector: AudioObjectPropertySelector,
         scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal,
+        element: AudioObjectPropertyElement = kAudioObjectPropertyElementMain,
         queue: DispatchQueue,
         handler: @escaping () -> Void
     ) {
         self.object = object
-        self.address = HAL.address(selector, scope: scope)
+        self.address = HAL.address(selector, scope: scope, element: element)
         self.queue = queue
         self.block = { _, _ in handler() }
         let status = AudioObjectAddPropertyListenerBlock(object, &address, queue, block)

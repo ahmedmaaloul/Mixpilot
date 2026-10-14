@@ -1,4 +1,5 @@
 import AppKit
+import MixpilotAudio
 import MixpilotCore
 
 /// Sample rows with real app icons, for SwiftUI previews and snapshots.
@@ -36,8 +37,29 @@ enum PreviewData {
     }
 }
 
+extension PreviewData {
+    /// A WhatsApp call with Music lowered and the microphone in use.
+    static func inCall() -> MixerModel {
+        var rows = apps
+        for index in rows.indices {
+            rows[index].callStatus = rows[index].id == "com.apple.FaceTime" ? .inCall : .lowered
+        }
+        return MixerModel(
+            previewApps: rows,
+            devices: devices,
+            callAppNames: ["FaceTime"],
+            microphone: MicrophoneState(deviceName: "MacBook Pro Microphone", volume: 0.7, isMuted: false, canMute: true),
+            microphoneUserNames: ["FaceTime"]
+        )
+    }
+}
+
 extension MixerModel {
     static func preview(_ apps: [AppRowState] = PreviewData.apps) -> MixerModel {
-        MixerModel(previewApps: apps, devices: PreviewData.devices)
+        MixerModel(
+            previewApps: apps,
+            devices: PreviewData.devices,
+            microphone: MicrophoneState(deviceName: "MacBook Pro Microphone", volume: 0.7, isMuted: false, canMute: true)
+        )
     }
 }

@@ -23,7 +23,9 @@ final class TapSession {
     let appID: String
     private(set) var processObjectIDs: [AudioObjectID]
     private(set) var gain: Double
-    /// Since when the gain has been back at 1 (see `TapPlanner.unityGrace`).
+    /// Call mode's level (1 = not lowered). Starts at 1 so a new session fades down to it.
+    private(set) var duck: Double = 1
+    /// Since when gain and duck have been back at 1 (see `TapPlanner.unityGrace`).
     var unitySince: Double?
 
     private let tapDescription: CATapDescription
@@ -78,6 +80,12 @@ final class TapSession {
     func setGain(_ gain: Double) {
         self.gain = gain
         output?.setGain(gain)
+    }
+
+    /// Fades to call mode's level for this app.
+    func setDuck(_ duck: Double) {
+        self.duck = duck
+        output?.setDuck(duck)
     }
 
     /// Changes which processes are tapped (an app started or stopped a helper), without a gap.
@@ -162,7 +170,9 @@ final class TapSession {
 
     private func makeOutput(on deviceUID: String) throws -> Output {
         let format = try Self.readFormat(of: tapID)
-        return try Output(tapUUID: tapDescription.uuid.uuidString, deviceUID: deviceUID, gain: gain, sampleRate: format.mSampleRate)
+        return try Output(
+            tapUUID: tapDescription.uuid.uuidString, deviceUID: deviceUID, gain: gain, duck: duck, sampleRate: format.mSampleRate
+        )
     }
 
     /// The tap's stream format, which must be 32-bit float. Waits briefly for a new tap to report it.
@@ -196,10 +206,10 @@ private final class Output {
     private var renderState: OpaquePointer?
     private var listeners: [HALListener] = []
 
-    init(tapUUID: String, deviceUID: String, gain: Double, sampleRate: Double) throws {
+    init(tapUUID: String, deviceUID: String, gain: Double, duck: Double, sampleRate: Double) throws {
         self.deviceUID = deviceUID
         do {
-            guard let state = MPRenderStateCreate(Float(gain), sampleRate) else {
+            guard let state = MPRenderStateCreate(Float(gain), Float(duck), sampleRate) else {
                 throw CoreAudioError(operation: "Allocate render state", status: kAudio_MemFullError)
             }
             renderState = state
@@ -244,6 +254,12 @@ private final class Output {
     func setGain(_ gain: Double) {
         if let renderState {
             MPRenderSetGain(renderState, Float(gain))
+        }
+    }
+
+    func setDuck(_ duck: Double) {
+        if let renderState {
+            MPRenderSetDuck(renderState, Float(duck))
         }
     }
 

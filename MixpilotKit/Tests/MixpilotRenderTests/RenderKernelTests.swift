@@ -3,7 +3,7 @@ import MixpilotRender
 import Testing
 
 /// An AudioBufferList with float buffers of `channelsPerBuffer` channels each, freed on deinit.
-private final class Buffers {
+final class Buffers {
     let list: UnsafeMutableAudioBufferListPointer
     private var storage: [UnsafeMutablePointer<Float>] = []
 
@@ -57,7 +57,7 @@ struct RenderKernelTests {
     let rate = 48_000.0
 
     @Test func unityGainPassesInterleavedStereoThrough() throws {
-        let state = try #require(MPRenderStateCreate(1, rate))
+        let state = try #require(MPRenderStateCreate(1, 1, rate))
         defer { MPRenderStateDestroy(state) }
         let input = Buffers(frames: 256, channelsPerBuffer: [2]) { frame, channel in
             Float(frame % 7) * 0.1 * (channel == 0 ? 1 : -1)
@@ -71,7 +71,7 @@ struct RenderKernelTests {
     }
 
     @Test func nonInterleavedInputReachesInterleavedOutput() throws {
-        let state = try #require(MPRenderStateCreate(0.5, rate))
+        let state = try #require(MPRenderStateCreate(0.5, 1, rate))
         defer { MPRenderStateDestroy(state) }
         let input = Buffers(frames: 64, channelsPerBuffer: [1, 1]) { _, channel in channel == 0 ? 0.4 : -0.2 }
         let output = Buffers(frames: 64, channelsPerBuffer: [2])
@@ -81,7 +81,7 @@ struct RenderKernelTests {
     }
 
     @Test func gainChangeRampsWithoutJumps() throws {
-        let state = try #require(MPRenderStateCreate(1, rate))
+        let state = try #require(MPRenderStateCreate(1, 1, rate))
         defer { MPRenderStateDestroy(state) }
         MPRenderSetGain(state, 0)
         let frames = 4_800 // 100 ms
@@ -103,7 +103,7 @@ struct RenderKernelTests {
     }
 
     @Test func rampContinuesAcrossBuffers() throws {
-        let state = try #require(MPRenderStateCreate(0, rate))
+        let state = try #require(MPRenderStateCreate(0, 1, rate))
         defer { MPRenderStateDestroy(state) }
         MPRenderSetGain(state, 1)
         let input = Buffers(frames: 128, channelsPerBuffer: [2]) { _, _ in 1 }
@@ -118,7 +118,7 @@ struct RenderKernelTests {
     }
 
     @Test func monoOutputGetsTheAverage() throws {
-        let state = try #require(MPRenderStateCreate(1, rate))
+        let state = try #require(MPRenderStateCreate(1, 1, rate))
         defer { MPRenderStateDestroy(state) }
         let input = Buffers(frames: 32, channelsPerBuffer: [2]) { _, channel in channel == 0 ? 0.6 : 0.2 }
         let output = Buffers(frames: 32, channelsPerBuffer: [1])
@@ -127,7 +127,7 @@ struct RenderKernelTests {
     }
 
     @Test func extraOutputChannelsAreSilent() throws {
-        let state = try #require(MPRenderStateCreate(1, rate))
+        let state = try #require(MPRenderStateCreate(1, 1, rate))
         defer { MPRenderStateDestroy(state) }
         let input = Buffers(frames: 32, channelsPerBuffer: [2]) { _, _ in 0.3 }
         let output = Buffers(frames: 32, channelsPerBuffer: [4]) { _, _ in 9 } // garbage before render
@@ -139,7 +139,7 @@ struct RenderKernelTests {
     }
 
     @Test func monoInputPlaysOnBothSides() throws {
-        let state = try #require(MPRenderStateCreate(1, rate))
+        let state = try #require(MPRenderStateCreate(1, 1, rate))
         defer { MPRenderStateDestroy(state) }
         let input = Buffers(frames: 16, channelsPerBuffer: [1]) { _, _ in 0.25 }
         let output = Buffers(frames: 16, channelsPerBuffer: [2])
@@ -150,7 +150,7 @@ struct RenderKernelTests {
 
     @Test func neverAmplifies() throws {
         // Even if asked for more, the output is never louder than the app's own sound.
-        let state = try #require(MPRenderStateCreate(2, rate))
+        let state = try #require(MPRenderStateCreate(2, 1, rate))
         defer { MPRenderStateDestroy(state) }
         #expect(MPRenderTargetGain(state) == 1)
         MPRenderSetGain(state, 3)
@@ -163,7 +163,7 @@ struct RenderKernelTests {
     }
 
     @Test func signalIsDetectedOnlyForNonZeroInput() throws {
-        let state = try #require(MPRenderStateCreate(1, rate))
+        let state = try #require(MPRenderStateCreate(1, 1, rate))
         defer { MPRenderStateDestroy(state) }
         let silence = Buffers(frames: 64, channelsPerBuffer: [2])
         let output = Buffers(frames: 64, channelsPerBuffer: [2])
@@ -176,7 +176,7 @@ struct RenderKernelTests {
     }
 
     @Test func invalidGainsAreClamped() throws {
-        let state = try #require(MPRenderStateCreate(.nan, rate))
+        let state = try #require(MPRenderStateCreate(.nan, 1, rate))
         defer { MPRenderStateDestroy(state) }
         #expect(MPRenderTargetGain(state) == 0)
         MPRenderSetGain(state, 100)
@@ -186,11 +186,74 @@ struct RenderKernelTests {
     }
 
     @Test func missingInputLeavesOutputSilent() throws {
-        let state = try #require(MPRenderStateCreate(1, rate))
+        let state = try #require(MPRenderStateCreate(1, 1, rate))
         defer { MPRenderStateDestroy(state) }
         let input = Buffers(frames: 16, channelsPerBuffer: [])
         let output = Buffers(frames: 16, channelsPerBuffer: [2]) { _, _ in 5 }
         render(state, input, output)
         #expect(output.sample(0, channel: 0) == 0)
+    }
+}
+
+@Suite("Render kernel: call mode fades")
+struct DuckTests {
+    let rate = 48_000.0
+
+    /// Renders `seconds` of a constant 0.5 signal and returns the last left sample.
+    func level(after seconds: Double, _ state: OpaquePointer) -> Float {
+        let frames = Int(seconds * rate)
+        let input = Buffers(frames: frames, channelsPerBuffer: [2]) { _, _ in 0.5 }
+        let output = Buffers(frames: frames, channelsPerBuffer: [2])
+        MPRenderProcess(state, input.list.unsafePointer, output.list.unsafeMutablePointer)
+        return output.sample(frames - 1, channel: 0)
+    }
+
+    @Test func duckingFadesDownInAboutHalfASecond() throws {
+        let state = try #require(MPRenderStateCreate(1, 1, rate))
+        defer { MPRenderStateDestroy(state) }
+        MPRenderSetDuck(state, 0.2)
+        // Still clearly audible after 50 ms: a fade, not a cut.
+        #expect(level(after: 0.05, state) > 0.35)
+        // Within 3 % of the lowered level after half a second more.
+        let settled = level(after: 0.5, state)
+        #expect(abs(settled - 0.1) < 0.015)
+    }
+
+    @Test func comingBackUpIsSlowerThanGoingDown() throws {
+        let down = try #require(MPRenderStateCreate(1, 1, rate))
+        let up = try #require(MPRenderStateCreate(1, 1, rate))
+        defer { MPRenderStateDestroy(down); MPRenderStateDestroy(up) }
+        MPRenderSetDuck(up, 0)
+        _ = level(after: 2, up)            // fully ducked
+        MPRenderSetDuck(down, 0)
+        MPRenderSetDuck(up, 1)
+        let afterDown = 0.5 - level(after: 0.2, down)  // how far it fell from 0.5
+        let afterUp = level(after: 0.2, up)            // how far it rose from 0
+        #expect(afterUp < afterDown)
+        #expect(abs(level(after: 1.5, up) - 0.5) < 0.01)
+    }
+
+    @Test func duckMultipliesTheVolume() throws {
+        let state = try #require(MPRenderStateCreate(0.5, 1, rate))
+        defer { MPRenderStateDestroy(state) }
+        MPRenderSetDuck(state, 0.2)
+        #expect(abs(level(after: 2, state) - 0.05) < 0.001)
+    }
+
+    @Test func volumeChangesStayQuickWhileDucked() throws {
+        let state = try #require(MPRenderStateCreate(1, 1, rate))
+        defer { MPRenderStateDestroy(state) }
+        MPRenderSetDuck(state, 0.5)
+        _ = level(after: 2, state)
+        MPRenderSetGain(state, 0.5)
+        // The volume ramp (15 ms) is done in 100 ms; the duck stays where it was.
+        #expect(abs(level(after: 0.1, state) - 0.125) < 0.002)
+    }
+
+    @Test func duckIsClampedToNeverAmplify() throws {
+        let state = try #require(MPRenderStateCreate(1, 1, rate))
+        defer { MPRenderStateDestroy(state) }
+        MPRenderSetDuck(state, 5)
+        #expect(level(after: 0.5, state) == 0.5)
     }
 }

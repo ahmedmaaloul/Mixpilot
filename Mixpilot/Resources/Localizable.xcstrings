@@ -31,6 +31,96 @@
         }
       }
     },
+    "Call Mode" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anrufmodus"
+          }
+        }
+      }
+    },
+    "In Call" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Anruf"
+          }
+        }
+      }
+    },
+    "In use by %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwendet von %@."
+          }
+        }
+      }
+    },
+    "Input Volume" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eingangslautstärke"
+          }
+        }
+      }
+    },
+    "Lowered" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leiser"
+          }
+        }
+      }
+    },
+    "Lowers other apps when a call starts." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macht andere Apps leiser, wenn ein Anruf beginnt."
+          }
+        }
+      }
+    },
+    "Microphone" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mikrofon"
+          }
+        }
+      }
+    },
+    "Mixpilot, Call Mode On" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mixpilot, Anrufmodus ein"
+          }
+        }
+      }
+    },
+    "Mixpilot, Microphone Off" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mixpilot, Mikrofon aus"
+          }
+        }
+      }
+    },
     "More" : {
       "localizations" : {
         "de" : {
@@ -57,6 +147,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keine App gibt Ton wieder"
+          }
+        }
+      }
+    },
+    "No Microphone" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein Mikrofon"
+          }
+        }
+      }
+    },
+    "Off for all apps." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für alle Apps aus."
+          }
+        }
+      }
+    },
+    "On during your call in %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein während deines Anrufs in %@."
+          }
+        }
+      }
+    },
+    "On until you turn it off." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein, bis du ihn ausschaltest."
           }
         }
       }

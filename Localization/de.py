@@ -7,6 +7,20 @@ Eingangslautstärke, Beenden. Informal "du", „…“ quotes, a space before an
 
 # English key (exactly as in the code) → German.
 DE = {
+    # Call mode ("Anrufmodus", masculine) and microphone.
+    "Call Mode": "Anrufmodus",
+    "In Call": "Im Anruf",
+    "In use by %@.": "Verwendet von %@.",
+    "Input Volume": "Eingangslautstärke",
+    "Lowered": "Leiser",
+    "Lowers other apps when a call starts.": "Macht andere Apps leiser, wenn ein Anruf beginnt.",
+    "Microphone": "Mikrofon",
+    "Mixpilot, Call Mode On": "Mixpilot, Anrufmodus ein",
+    "Mixpilot, Microphone Off": "Mixpilot, Mikrofon aus",
+    "No Microphone": "Kein Mikrofon",
+    "Off for all apps.": "Für alle Apps aus.",
+    "On during your call in %@.": "Ein während deines Anrufs in %@.",
+    "On until you turn it off.": "Ein, bis du ihn ausschaltest.",
     "%@ (Not Connected)": "%@ (nicht verbunden)",
     "About Mixpilot": "Über Mixpilot",
     "Apps appear here when they play sound.": "Apps werden hier angezeigt, wenn sie Ton wiedergeben.",

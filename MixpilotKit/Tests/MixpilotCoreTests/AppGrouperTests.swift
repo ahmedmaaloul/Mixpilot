@@ -107,6 +107,35 @@ struct AppGrouperTests {
         #expect(result.map(\.id) == ["com.example.game"])
     }
 
+    @Test func faceTimeCallAudioBelongsToFaceTime() {
+        // avconferenced is listed as a (background-only) running app itself.
+        let avconferenced = RunningApp(pid: 1037, bundleID: "com.apple.avconferenced", isBackgroundOnly: true)
+        let faceTime = RunningApp(pid: 2000, bundleID: "com.apple.FaceTime")
+        let call = AudioProcess(id: 102, pid: 1037, bundleID: "com.apple.avconferenced", isRunningOutput: true, isRunningInput: true)
+        let result = AppGrouper.group([call], runningApps: [avconferenced, faceTime])
+        #expect(result.map(\.id) == ["com.apple.FaceTime"])
+        #expect(result.first?.isUsingMicrophone == true)
+    }
+
+    @Test func phoneCallAudioBelongsToPhoneWhenFaceTimeIsClosed() {
+        let avconferenced = RunningApp(pid: 1037, bundleID: "com.apple.avconferenced", isBackgroundOnly: true)
+        let phone = RunningApp(pid: 2001, bundleID: "com.apple.mobilephone")
+        let call = AudioProcess(id: 102, pid: 1037, bundleID: "com.apple.avconferenced", isRunningOutput: true, isRunningInput: true)
+        #expect(AppGrouper.group([call], runningApps: [avconferenced, phone]).map(\.id) == ["com.apple.mobilephone"])
+    }
+
+    @Test func callDaemonWithoutItsAppsIsHidden() {
+        let avconferenced = RunningApp(pid: 1037, bundleID: "com.apple.avconferenced", isBackgroundOnly: true)
+        let call = AudioProcess(id: 102, pid: 1037, bundleID: "com.apple.avconferenced", isRunningOutput: true, isRunningInput: false)
+        #expect(AppGrouper.group([call], runningApps: [avconferenced]).isEmpty)
+    }
+
+    @Test func backgroundOnlyAppsAreHidden() {
+        let daemon = RunningApp(pid: 50, bundleID: "com.example.daemon", isBackgroundOnly: true)
+        let process = AudioProcess(id: 1, pid: 50, bundleID: "com.example.daemon", isRunningOutput: true, isRunningInput: false)
+        #expect(AppGrouper.group([process], runningApps: [daemon]).isEmpty)
+    }
+
     @Test func appWithoutBundleIDGetsAPIDIdentifier() {
         let tool = RunningApp(pid: 77, bundleID: nil)
         let result = AppGrouper.group(

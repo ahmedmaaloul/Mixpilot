@@ -18,9 +18,9 @@ extern "C" {
 /// only the functions below touch it.
 typedef struct MPRenderState MPRenderState;
 
-/// Allocates a state with an initial gain (applied without a ramp) for audio at `sampleRate`.
-/// Call off the audio thread. Returns NULL if out of memory.
-MPRenderState *_Nullable MPRenderStateCreate(float gain, double sampleRate);
+/// Allocates a state with an initial gain and call-mode level (applied without a ramp) for audio
+/// at `sampleRate`. Call off the audio thread. Returns NULL if out of memory.
+MPRenderState *_Nullable MPRenderStateCreate(float gain, float duck, double sampleRate);
 
 /// Frees the state. Only after the IOProc using it has been stopped and destroyed.
 void MPRenderStateDestroy(MPRenderState *_Nullable state);
@@ -28,6 +28,10 @@ void MPRenderStateDestroy(MPRenderState *_Nullable state);
 /// Sets the gain the audio thread ramps to (0 = silent, 1 = unchanged). Values above 1 are
 /// clamped to 1: Mixpilot never amplifies. Any thread.
 void MPRenderSetGain(MPRenderState *_Nonnull state, float gain);
+
+/// Sets call mode's level for this app (0…1, 1 = not lowered). It multiplies the gain and fades
+/// slowly (about 0.5 s down, 1 s up) so other apps duck calmly when a call starts. Any thread.
+void MPRenderSetDuck(MPRenderState *_Nonnull state, float level);
 
 /// The gain the audio thread ramps to.
 float MPRenderTargetGain(const MPRenderState *_Nonnull state);

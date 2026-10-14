@@ -7,7 +7,10 @@ import os
 public struct TapRequest: Sendable, Equatable {
     public var appID: String
     public var processObjectIDs: [UInt32]
+    /// The person's volume and mute.
     public var gain: Double
+    /// Call mode's level: 1 = not lowered.
+    public var duck: Double
     public var isPlaying: Bool
     /// The devices the app plays to; empty if it isn't playing.
     public var outputDeviceIDs: [UInt32]
@@ -19,6 +22,7 @@ public struct TapRequest: Sendable, Equatable {
         appID: String,
         processObjectIDs: [UInt32],
         gain: Double,
+        duck: Double = 1,
         isPlaying: Bool,
         outputDeviceIDs: [UInt32],
         preferredOutputUID: String? = nil
@@ -26,6 +30,7 @@ public struct TapRequest: Sendable, Equatable {
         self.appID = appID
         self.processObjectIDs = processObjectIDs
         self.gain = gain
+        self.duck = duck
         self.isPlaying = isPlaying
         self.outputDeviceIDs = outputDeviceIDs
         self.preferredOutputUID = preferredOutputUID
@@ -152,6 +157,7 @@ public final class TapManager: @unchecked Sendable {
                 appID: request.appID,
                 processObjectIDs: request.processObjectIDs,
                 gain: request.gain,
+                duck: request.duck,
                 isPlaying: request.isPlaying,
                 outputDeviceUID: chosen ?? own,
                 isRerouted: chosen.map { $0 != own } ?? false
@@ -167,6 +173,7 @@ public final class TapManager: @unchecked Sendable {
                 processObjectIDs: $0.processObjectIDs,
                 outputDeviceUID: $0.outputDeviceUID,
                 gain: $0.gain,
+                duck: $0.duck,
                 isRunning: $0.isRunning,
                 unitySince: $0.unitySince
             )
@@ -214,6 +221,8 @@ public final class TapManager: @unchecked Sendable {
                 if target.isPlaying {
                     try start(session)
                 }
+                // Starts at 1 and fades down, so call mode lowers newly playing apps calmly too.
+                session.setDuck(target.duck)
                 let milliseconds = Int((ProcessInfo.processInfo.systemUptime - started) * 1000)
                 log.info("Tapping \(target.appID, privacy: .public) on \(target.outputDeviceUID, privacy: .public) (\(milliseconds) ms)")
             } catch {
@@ -232,7 +241,12 @@ public final class TapManager: @unchecked Sendable {
         case .setGain(let appID, let gain):
             guard let session = sessions[appID] else { return }
             session.setGain(gain)
-            session.unitySince = gain == 1 ? (session.unitySince ?? now) : nil
+            updateUnity(of: session, now: now)
+        case .setDuck(let appID, let duck):
+            guard let session = sessions[appID] else { return }
+            session.setDuck(duck)
+            updateUnity(of: session, now: now)
+            log.info("\(appID, privacy: .public) \(duck < 1 ? "lowered for call mode" : "back from call mode", privacy: .public)")
         case .setProcesses(let appID, let processObjectIDs):
             do {
                 try sessions[appID]?.setProcesses(processObjectIDs)
@@ -252,6 +266,11 @@ public final class TapManager: @unchecked Sendable {
             lastCallbackCounts[appID] = nil
             log.info("Paused \(appID, privacy: .public)")
         }
+    }
+
+    /// Records when a session got back to gain 1 and duck 1, for the grace period.
+    private func updateUnity(of session: TapSession, now: Double) {
+        session.unitySince = session.gain == 1 && session.duck == 1 ? (session.unitySince ?? now) : nil
     }
 
     private func start(_ session: TapSession) throws {
@@ -410,7 +429,7 @@ public final class TapManager: @unchecked Sendable {
     private func scheduleDeadline() {
         deadline?.cancel()
         let states = sessions.mapValues {
-            TapSessionState(processObjectIDs: [], outputDeviceUID: "", gain: $0.gain, isRunning: false, unitySince: $0.unitySince)
+            TapSessionState(processObjectIDs: [], outputDeviceUID: "", gain: $0.gain, duck: $0.duck, isRunning: false, unitySince: $0.unitySince)
         }
         guard let time = TapPlanner.nextDeadline(sessions: states) else { return }
         let work = DispatchWorkItem { [weak self] in self?.reconcile() }
