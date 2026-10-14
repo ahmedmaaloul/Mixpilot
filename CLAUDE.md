@@ -311,9 +311,15 @@ strict CSP and serves `public/`. The download is `public/download/Mixpilot.dmg` 
 release script). Screenshots come from `scripts/snapshots.sh` (copy `build/snapshots/panel-*` to
 `website/assets/`). The user is in France: no German Impressum; French *mentions légales* for a
 non-professional individual can list just the host (offered, not added). The GitHub repo is private
-for now; its homepage points to the site. Deploy: from `website/`,
-`npx --yes vercel@60.1.3 deploy --prod` (project `mixpilot`, the user's Vercel login on this Mac).
-DNS: the user adds `mixpilot` → Vercel's CNAME at Spaceship.
+for now; its homepage points to the site.
+
+**Deploy = push to `main`.** The Vercel project `mixpilot` (team "Ahmed Maaloul's projects") is
+connected to the GitHub repo with **Root Directory `website`**; every push to `main` deploys
+`website/public` to production (mixpilot.blitzraum.com, mixpilot-henna.vercel.app). Don't run
+`vercel deploy` from `website/` (the root directory would apply twice). When the project was first
+linked, its root was the repo root and a push deployed an empty site over the real one (404):
+check the Root Directory if that ever happens again. DNS: the user adds `A mixpilot 76.76.21.21`
+at Spaceship (Vercel's recommendation).
 
 Snapshot rendering pitfalls (for pictures that look like a Mac in use):
 - `cacheDisplay` draws controls inactive. `SnapshotRenderer` shows a borderless key window and
