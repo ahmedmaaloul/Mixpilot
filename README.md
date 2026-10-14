@@ -87,10 +87,9 @@ conventions are described in [CLAUDE.md](CLAUDE.md).
 
 ## Contributing
 
-Bug reports and ideas are welcome as [issues](https://github.com/ahmedmaaloul/Mixpilot/issues).
-For code changes, please open an issue first. By contributing, you agree that your contribution is
-licensed under the project's license and may also be included in commercial licenses granted by the
-author.
+Bug reports and ideas are welcome as [issues](https://github.com/ahmedmaaloul/Mixpilot/issues/new/choose).
+For code changes, please read [CONTRIBUTING.md](CONTRIBUTING.md) and open an issue first. Security
+problems: see [SECURITY.md](SECURITY.md).
 
 ## License
 

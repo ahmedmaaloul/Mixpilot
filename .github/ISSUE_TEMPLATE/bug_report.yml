@@ -1,0 +1,72 @@
+name: Bug report
+description: Something doesn't sound or work right.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. The details below make it possible to reproduce the problem,
+        especially with hardware and apps the developer may not own.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+      placeholder: "During a WhatsApp call, Spotify didn't get quieter…"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Play music in Spotify
+        2. Start a WhatsApp call
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: apps
+    attributes:
+      label: Apps involved
+      description: Name and version, for example "WhatsApp 25.30, Spotify 1.2.70, Chrome 141".
+    validations:
+      required: true
+  - type: input
+    id: devices
+    attributes:
+      label: Output and input devices
+      description: For example "MacBook Pro speakers, AirPods Pro 2", or an audio interface.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "macOS 27.0"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Mixpilot version
+      description: Mixpilot ▸ ⋯ ▸ About Mixpilot.
+      placeholder: "0.1.0 (2)"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log (optional, helps a lot)
+      description: |
+        Run this in Terminal, reproduce the problem, then press Control-C and paste the output.
+        It shows which apps Mixpilot adjusted and why, and nothing about what you hear.
+        `log stream --level info --predicate 'subsystem == "app.mixpilot.mac"'`
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you send it
+      options:
+        - label: Mixpilot is allowed under System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording ▸ System Audio Recording Only.
+          required: true

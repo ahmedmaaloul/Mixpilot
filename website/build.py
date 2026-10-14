@@ -55,6 +55,7 @@ TEXT = {
         "footer_license": f"Mixpilot is free for personal and other noncommercial use. For commercial use, ask at {EMAIL}.",
         "footer_trademarks": "Apple, Mac, macOS, FaceTime and AirPods are trademarks of Apple Inc. Other product names are trademarks of their owners. Mixpilot is not affiliated with Apple.",
         "other_language": "Deutsch",
+        "source": "Source on GitHub",
         "skip": "Skip to content",
         # Privacy policy
         "privacy_page_title": "Privacy Policy – Mixpilot",
@@ -134,6 +135,7 @@ TEXT = {
         "footer_license": f"Mixpilot ist für private und andere nicht kommerzielle Nutzung kostenlos. Für kommerzielle Nutzung frag bitte unter {EMAIL}.",
         "footer_trademarks": "Apple, Mac, macOS, FaceTime und AirPods sind Marken der Apple Inc. Andere Produktnamen sind Marken ihrer Inhaber. Mixpilot steht in keiner Verbindung zu Apple.",
         "other_language": "English",
+        "source": "Quellcode auf GitHub",
         "skip": "Zum Inhalt springen",
         "privacy_page_title": "Datenschutzerklärung – Mixpilot",
         "privacy_heading": "Datenschutzerklärung",
@@ -251,6 +253,7 @@ def footer(lang, t, page):
       <span class="links">
         <a href="{path_for(lang, "privacy")}">{t["nav_privacy"]}</a>
         <a href="{path_for(lang, "support")}">{t["nav_support"]}</a>
+        <a href="https://github.com/ahmedmaaloul/Mixpilot">{t["source"]}</a>
         <a href="{path_for(other, page)}" hreflang="{other}" lang="{other}">{t["other_language"]}</a>
       </span>
     </div>

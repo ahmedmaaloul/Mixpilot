@@ -3,7 +3,7 @@
 A macOS menu bar app that sets the volume of each app separately, like the volume mixer on Windows.
 Main use case: during a call, keep the call loud and everything else quiet. English and German,
 following the system language. Distributed outside the App Store (Developer ID, notarized).
-macOS 14.4 or newer. One dependency, approved by the user: KeyboardShortcuts 3.1.0 (see Dependencies).
+macOS 14.4 or newer. One dependency: KeyboardShortcuts 3.1.0 (see Dependencies).
 
 ## Layout
 
@@ -39,7 +39,7 @@ scripts/                     build.sh, run.sh, snapshots.sh, debug-volume.swift 
 website/                     mixpilot.blitzraum.com: build.py (texts EN/DE) + assets/ → public/ (static)
 docs/images/                 Icon and screenshots for the README
 README.md, README.de.md      Project README in English and German
-LICENSE.md                   PolyForm Noncommercial 1.0.0 (commercial use only with the user's permission)
+LICENSE.md                   PolyForm Noncommercial 1.0.0 (commercial use only with written permission)
 ```
 
 The `.xcodeproj` uses folder-synchronized groups: any file under `Mixpilot/` is in the target
@@ -116,8 +116,8 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
   (input scope, main element or channels 1–2); hidden if not settable.
 - **Menu bar icon**: `mic.slash` while the microphone is off (most important), `phone` while call
   mode is on, else `slider.vertical.3`.
-- **Volume**: 0–100 %, where 100 % is the app's own level. **No boost, by the user's decision: Mixpilot
-  only makes apps quieter, to protect hearing and speakers ("we are not Windows").** Enforced twice:
+- **Volume**: 0–100 %, where 100 % is the app's own level. **No boost, by design: Mixpilot only makes apps
+  quieter, to protect hearing and speakers.** Enforced twice:
   `AppAudioSettings.volumeRange` is 0…1 (stored values above are clamped on load) and the C kernel
   clamps every gain to 1. Don't add amplification back without asking.
 - **Fail open**: on any error the session is destroyed and the app is blocked for 10 s;
@@ -183,7 +183,7 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
 - The responsible-PID SPI exists on macOS 27 and maps `com.apple.WebKit.GPU` → Mail/Safari; Chrome
   and Electron helpers also have the app as parent.
 - macOS 26 added `CATapDescription.bundleIDs` and `processRestoreEnabled` (not usable on 14.4).
-- The first tap start shows the System Audio Recording prompt (~2 s until the user answers). After
+- The first tap start shows the System Audio Recording prompt (~2 s until the person answers). After
   that, creating a session and starting it takes ~50–90 ms.
 - When an app reopens its stream after a long pause, its first ~100 ms play at its own level until
   `start` runs (`.mutedWhenTapped` only mutes while read). Accepted for fail-open safety; `.muted`
@@ -205,7 +205,7 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
   (`Mixpilot.app/Contents/MacOS/Mixpilot …`) is checked against the terminal's permission, not
   Mixpilot's. Always `open` the app to test permissions; snapshots (started that way) show the
   permission as missing.
-- Mic Modes (Standard / Voice Isolation / Wide Spectrum) are per app, set by the user in Control
+- Mic Modes (Standard / Voice Isolation / Wide Spectrum) are per app, set by the person in Control
   Center; no public API reads or sets another app's mode, so Mixpilot doesn't offer it. The mic mute
   (device level, before any app's processing) and the input volume (the device's hardware level,
   like Sound settings) don't change the chosen mode. Apps with voice processing may also make macOS
@@ -254,8 +254,9 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
   synthetic click on the `NSStatusBarButton` does nothing), and computer use can't target a debug
   build. Check the live panel by hand.
 - Commit and push each finished step; commits use the GitHub noreply address (set in this repo).
-  **All credit goes to the user: no `Co-Authored-By` trailers, no "Generated with" lines in PRs.**
-- No third-party dependencies beyond KeyboardShortcuts without asking the user.
+  Commits are authored by the maintainer only: no `Co-Authored-By` trailers, no "Generated with" lines
+  in pull requests.
+- No third-party dependencies beyond KeyboardShortcuts without the maintainer's approval.
 
 ## App shell (M5)
 
@@ -299,7 +300,7 @@ Release builds fine at our 14.4 target (it uses `isolated deinit`).
 - The MIT notice must stay in the About credits (`AppWindows.acknowledgements`).
 - To update: read the new release's source, bump `version` in `project.pbxproj`, resolve, compare its
   en.lproj keys with ours, check the placeholder width, build Release, test the recorder in German.
-- Any other dependency needs the user's approval first.
+- Any other dependency needs the maintainer's approval first.
 
 ## Website
 
@@ -309,17 +310,13 @@ headlines, light/dark from `prefers-color-scheme`, blue pill buttons, rounded ti
 soft gradient "wallpaper". No JavaScript, no cookies, no web fonts; `website/vercel.json` sets a
 strict CSP and serves `public/`. The download is `public/download/Mixpilot.dmg` (written by the
 release script). Screenshots come from `scripts/snapshots.sh` (copy `build/snapshots/panel-*` to
-`website/assets/`). The user is in France: no German Impressum; French *mentions légales* for a
-non-professional individual can list just the host (offered, not added). The GitHub repo is private
-for now; its homepage points to the site.
+`website/assets/`). Legal pages: Privacy (GDPR) and Support. The GitHub repo's homepage points to the site.
 
-**Deploy = push to `main`.** The Vercel project `mixpilot` (team "Ahmed Maaloul's projects") is
-connected to the GitHub repo with **Root Directory `website`**; every push to `main` deploys
+**Deploy = push to `main`.** The Vercel project `mixpilot` is connected to the GitHub repo with **Root Directory `website`**; every push to `main` deploys
 `website/public` to production (mixpilot.blitzraum.com, mixpilot-henna.vercel.app). Don't run
 `vercel deploy` from `website/` (the root directory would apply twice). When the project was first
 linked, its root was the repo root and a push deployed an empty site over the real one (404):
-check the Root Directory if that ever happens again. DNS: the user adds `A mixpilot 76.76.21.21`
-at Spaceship (Vercel's recommendation).
+check the Root Directory if that ever happens again. DNS: an `A` record `mixpilot` → `76.76.21.21`.
 
 Snapshot rendering pitfalls (for pictures that look like a Mac in use):
 - `cacheDisplay` draws controls inactive. `SnapshotRenderer` shows a borderless key window and
@@ -333,7 +330,7 @@ Snapshot rendering pitfalls (for pictures that look like a Mac in use):
 ## Release
 
 `scripts/release-mac.sh` (like Handpilot's): localize + package tests → archive → export
-developer-id → hardened-runtime check → DMG → sign → notarize (`--keychain-profile handpilot`) →
+developer-id → hardened-runtime check → DMG → sign → notarize (`--keychain-profile <profile>`, default `handpilot`) →
 staple → `spctl` → copy to `website/public/download/Mixpilot.dmg` (push to publish).
 
 **Installer window** (`scripts/dmg/`): an indigo background with "Drag Mixpilot into Applications"
@@ -351,7 +348,7 @@ first. Download: mixpilot.blitzraum.com (Vercel). Support: support@blitzraum.com
 1. ✅ List apps producing audio, live updating, in a native menu bar panel.
 2. ✅ Per-app volume and mute with process taps, clean teardown.
 3. ✅ Per-app output device, saved settings, device-change handling. (Boost above 100 % was built,
-   then removed at the user's request.)
+   then removed by design.)
 4. ✅ Call detection and automatic lowering, microphone section.
 5. ✅ Shortcuts, launch at login, settings window, onboarding, full English and German, app icon,
    privacy manifest, release script.

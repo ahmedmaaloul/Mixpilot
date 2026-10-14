@@ -1,0 +1,16 @@
+name: Idea
+description: A call app Mixpilot should recognize, or something it should do.
+labels: ["idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Mixpilot to do?
+      description: Describe the situation you're in; the "why" matters more than the solution.
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: App (if it's about a call app)
+      description: Its name, and its bundle ID if you know it (Finder ▸ Show Package Contents ▸ Contents/Info.plist ▸ CFBundleIdentifier).
