@@ -1,0 +1,21 @@
+// Build settings for Mixpilot. This is the only file to edit to change the bundle ID,
+// the signing team or the version.
+
+// The bundle ID is <BUNDLE_ID_BASE>.mac. Permanent once released: macOS keys the
+// System Audio Recording permission and the saved settings to it.
+BUNDLE_ID_BASE = app.mixpilot
+
+// Apple Developer Team ID (paid Developer Program, also signs Developer ID releases).
+// Leave it empty to sign ad hoc ("Sign to Run Locally").
+DEVELOPMENT_TEAM = NSRXRUC9KF
+
+// Shown to users, and the build number, which must go up with every release.
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+
+// Without a team, sign ad hoc; with a team, use the Apple Development certificate.
+// A stable signature matters: macOS ties the System Audio Recording permission to it,
+// and ad hoc builds lose it on every rebuild.
+MIXPILOT_SIGN_IDENTITY_ = -
+CODE_SIGN_IDENTITY = $(MIXPILOT_SIGN_IDENTITY_$(DEVELOPMENT_TEAM):default=Apple Development)
+CODE_SIGN_STYLE = Automatic
