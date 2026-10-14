@@ -1,0 +1,23 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSAudioCaptureUsageDescription" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mixpilot benötigt Zugriff auf den Ton von Apps, damit du die Lautstärke jeder App ändern kannst. Der Ton wird auf deinem Mac verarbeitet und weder gespeichert noch gesendet."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Mixpilot needs access to the sound apps play so you can change each app’s volume. Sound is processed on your Mac and is never saved or sent."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
