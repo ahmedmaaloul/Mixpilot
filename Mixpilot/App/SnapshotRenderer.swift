@@ -17,8 +17,14 @@ enum SnapshotRenderer {
             ("panel-apps", AnyView(MixerPanel(model: .preview()))),
             ("panel-empty", AnyView(MixerPanel(model: .preview([])))),
             ("panel-call", AnyView(MixerPanel(model: PreviewData.inCall()))),
+            ("onboarding", AnyView(OnboardingView(loginItem: LoginItem()))),
+            ("settings", AnyView(SettingsView(model: .preview(), loginItem: LoginItem()))),
             ("panel-permission", AnyView(MixerPanel(model: MixerModel(previewApps: PreviewData.apps, needsAudioPermission: true)))),
         ]
+    }
+
+    static var isRequested: Bool {
+        ProcessInfo.processInfo.arguments.contains("-MixpilotSnapshots")
     }
 
     /// Renders and quits if the launch arguments ask for it; returns false otherwise.

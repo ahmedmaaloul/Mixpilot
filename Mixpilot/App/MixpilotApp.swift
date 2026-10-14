@@ -5,23 +5,42 @@ import SwiftUI
 @main
 struct MixpilotApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    /// People decide whether the icon is in the menu bar (HIG). When it's hidden, opening Mixpilot
+    /// again shows Settings.
+    @AppStorage("showInMenuBar") private var showInMenuBar = true
 
     var body: some Scene {
         // A window, not a menu: per-app sliders are too complex for a menu (HIG), the same choice
         // Control Center's Sound module makes. The system draws the panel's material and shape.
-        MenuBarExtra {
+        MenuBarExtra(isInserted: $showInMenuBar) {
             MixerPanel(model: appDelegate.model)
         } label: {
             MenuBarIcon(model: appDelegate.model)
         }
         .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView(model: appDelegate.model, loginItem: appDelegate.loginItem)
+        }
+
+        Window("Welcome to Mixpilot", id: WindowID.onboarding) {
+            OnboardingView(loginItem: appDelegate.loginItem)
+        }
+        .windowResizability(.contentSize)
+        .windowStyle(.hiddenTitleBar)
+        .defaultPosition(.center)
     }
+}
+
+enum WindowID {
+    static let onboarding = "onboarding"
 }
 
 /// Owns the model so it exists from launch, before the panel is ever opened, and makes sure every
 /// app gets its own sound back when Mixpilot quits.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = MixerModel()
+    let loginItem = LoginItem()
     private var signalSources: [DispatchSourceSignal] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -33,9 +52,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MicrophoneController.restoreLeftovers()
         handleTerminationSignals()
         model.start()
+        Shortcuts.install(model: model)
         #if DEBUG
         model.installDebugHooks()
         #endif
+    }
+
+    /// Opening Mixpilot while it runs (Finder, Spotlight, Launchpad) shows Settings: the way back
+    /// when the menu bar icon is hidden.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        AppWindows.openSettings()
+        return false
     }
 
     func applicationWillTerminate(_ notification: Notification) {

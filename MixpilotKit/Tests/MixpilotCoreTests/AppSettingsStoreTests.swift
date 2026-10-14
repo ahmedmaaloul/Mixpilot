@@ -161,3 +161,49 @@ struct OutputDeviceKindTests {
         #expect(OutputDevice.Kind.classify(transport: 0, name: "Mystery") == .other)
     }
 }
+
+@Suite("Call mode settings storage")
+struct CallModeSettingsTests {
+    @Test func defaultsWhenNothingIsStored() {
+        let temporary = TemporaryDefaults()
+        let settings = CallModeSettings.load(from: temporary.defaults)
+        #expect(settings.isAutomatic)
+        #expect(settings.level == 0.2)
+        #expect(settings.callApps == KnownCallApps.all)
+    }
+
+    @Test func settingsSurviveARelaunch() {
+        let temporary = TemporaryDefaults()
+        CallModeSettings(isAutomatic: false, level: 0.35, excludedApps: ["com.google.Chrome"]).save(to: temporary.defaults)
+        let loaded = CallModeSettings.load(from: temporary.defaults)
+        #expect(!loaded.isAutomatic)
+        #expect(loaded.level == 0.35)
+        #expect(!loaded.callApps.contains("com.google.Chrome"))
+        #expect(loaded.callApps.contains("net.whatsapp.WhatsApp"))
+    }
+
+    @Test func defaultSettingsAreNotStored() {
+        let temporary = TemporaryDefaults()
+        CallModeSettings(level: 0.5).save(to: temporary.defaults)
+        CallModeSettings().save(to: temporary.defaults)
+        #expect(temporary.defaults.data(forKey: CallModeSettings.defaultsKey) == nil)
+    }
+
+    @Test func levelIsClamped() {
+        #expect(CallModeSettings(level: 3).level == 1)
+        #expect(CallModeSettings(level: -1).level == 0)
+        var settings = CallModeSettings()
+        settings.level = .nan
+        #expect(settings.level == 0.2)
+    }
+
+    @Test func corruptOrPartialDataFallsBackToDefaults() {
+        let temporary = TemporaryDefaults()
+        temporary.defaults.set(Data("{".utf8), forKey: CallModeSettings.defaultsKey)
+        #expect(CallModeSettings.load(from: temporary.defaults) == CallModeSettings())
+        temporary.defaults.set(Data(#"{"level": 7}"#.utf8), forKey: CallModeSettings.defaultsKey)
+        let partial = CallModeSettings.load(from: temporary.defaults)
+        #expect(partial.level == 1)
+        #expect(partial.isAutomatic)
+    }
+}

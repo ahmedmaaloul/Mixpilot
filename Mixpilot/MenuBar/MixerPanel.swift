@@ -54,13 +54,19 @@ private struct PanelHeader: View {
     }
 }
 
-/// About and Quit, in a standard menu (action items are text only, as on macOS 27).
+/// Settings, About and Quit, in a standard menu (action items are text only, as on macOS 27).
 private struct MoreMenu: View {
+    @Environment(\.openSettings) private var openSettings
+
     var body: some View {
         Menu {
-            Button("About Mixpilot") {
+            Button("Settings…") {
                 NSApp.activate()
-                NSApp.orderFrontStandardAboutPanel(nil)
+                openSettings()
+            }
+            .keyboardShortcut(",")
+            Button("About Mixpilot") {
+                AppWindows.showAbout()
             }
             Divider()
             Button("Quit Mixpilot") {

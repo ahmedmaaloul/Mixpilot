@@ -50,6 +50,17 @@ final class MixerModel {
     private(set) var microphone = MicrophoneState()
     /// Names of the apps using the microphone right now.
     private(set) var microphoneUserNames: [String] = []
+    /// Settings ▸ Calls.
+    private(set) var callModeSettings = CallModeSettings()
+    /// Apps with remembered settings, for Settings ▸ Apps.
+    private(set) var rememberedApps: [RememberedApp] = []
+
+    struct RememberedApp: Identifiable, Equatable {
+        let id: String
+        let name: String
+        let icon: NSImage
+        let settings: AppAudioSettings
+    }
 
     @ObservationIgnored private let monitor: ProcessMonitor?
     @ObservationIgnored private let devices: DeviceMonitor?
@@ -78,6 +89,9 @@ final class MixerModel {
         let store = AppSettingsStore()
         self.store = store
         settings = store.all
+        callModeSettings = CallModeSettings.load()
+        callMode.configuration = configuration(for: callModeSettings)
+        refreshRememberedApps()
     }
 
     /// Fixed rows, for previews and snapshots. Never touches Core Audio or saved settings.
@@ -158,6 +172,10 @@ final class MixerModel {
             let device = info["device"] as? String
             let callMode = info["callMode"] as? Bool
             let micMuted = info["micMuted"] as? Bool
+            if info["probePermission"] != nil {
+                let granted = AudioPermission.isGranted()
+                Logger(subsystem: "app.mixpilot.mac", category: "permission").notice("Permission probe: \(granted)")
+            }
             MainActor.assumeIsolated {
                 self?.log.info("Debug request for \(appID, privacy: .public)")
                 if let volume { self?.setVolume(volume, for: appID) }
@@ -196,10 +214,81 @@ final class MixerModel {
         microphoneController?.setVolume(volume)
     }
 
-    /// How loud other apps play during calls (0…1). Adjustable in Settings.
+    func toggleCallMode() {
+        setCallMode(!isCallModeActive)
+    }
+
+    func toggleMicrophone() {
+        setMicrophoneMuted(!microphone.isMuted)
+    }
+
+    func setCallModeSettings(_ newSettings: CallModeSettings) {
+        callModeSettings = newSettings
+        if store != nil {
+            newSettings.save()
+        }
+        callMode.configuration = configuration(for: newSettings)
+        updateCallMode()
+        callModeChanged()
+    }
+
+    private func configuration(for settings: CallModeSettings) -> CallMode.Configuration {
+        CallMode.Configuration(callApps: settings.callApps, isAutomatic: settings.isAutomatic)
+    }
+
+    /// How loud other apps play during calls (0…1).
     private var callModeLevel: Double {
-        let stored = UserDefaults.standard.object(forKey: "callModeLevel") as? Double
-        return min(max(stored ?? 0.2, 0), 1)
+        callModeSettings.level
+    }
+
+    // MARK: - Shortcuts and remembered apps
+
+    /// Turns the app in front up or down (keyboard shortcuts), in steps like the volume keys.
+    func adjustFrontmostApp(by step: Double) {
+        guard let app = NSWorkspace.shared.frontmostApplication,
+              let appID = app.bundleIdentifier,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier
+        else { return }
+        let current = settings[appID] ?? .unchanged
+        let volume = min(max((current.isMuted ? 0 : current.volume) + step, 0), 1)
+        setVolume(volume, for: appID)
+        let name = app.localizedName ?? appID
+        let percent = volume.formatted(.percent.precision(.fractionLength(0)))
+        // There is no system volume HUD for one app; VoiceOver users hear the result.
+        NSAccessibility.post(
+            element: NSApp as Any,
+            notification: .announcementRequested,
+            userInfo: [.announcement: "\(name) \(percent)", .priority: NSAccessibilityPriorityLevel.high.rawValue]
+        )
+    }
+
+    /// Forgets an app's volume, mute and output device: it plays as it does on its own again.
+    func forget(_ appID: String) {
+        settings[appID] = nil
+        store?.remove(appID)
+        if let index = apps.firstIndex(where: { $0.id == appID }) {
+            apps[index].settings = .unchanged
+            lastKnown[appID] = apps[index]
+        }
+        refreshRememberedApps()
+        sendTapRequests()
+    }
+
+    func forgetAll() {
+        for appID in Array(settings.keys) {
+            forget(appID)
+        }
+        store?.removeAll()
+    }
+
+    private func refreshRememberedApps() {
+        guard let store else { return }
+        rememberedApps = store.all
+            .map { appID, setting in
+                let identity = directory.identity(forBundleID: appID)
+                return RememberedApp(id: appID, name: identity.name, icon: identity.icon, settings: setting)
+            }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     /// Feeds call detection with the apps using the microphone, then re-evaluates when a delay
@@ -268,6 +357,7 @@ final class MixerModel {
             apps[index].settings = setting
             lastKnown[appID] = apps[index]
         }
+        refreshRememberedApps()
         sendTapRequests()
     }
 

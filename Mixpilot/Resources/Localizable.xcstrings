@@ -11,12 +11,92 @@
         }
       }
     },
+    "About" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Info"
+          }
+        }
+      }
+    },
     "About Mixpilot" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Über Mixpilot"
+          }
+        }
+      }
+    },
+    "Acknowledgements" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Danksagungen"
+          }
+        }
+      }
+    },
+    "Allow Access" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zugriff erlauben"
+          }
+        }
+      }
+    },
+    "Allow Access to App Sound" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zugriff auf den Ton von Apps erlauben"
+          }
+        }
+      }
+    },
+    "Allow Mixpilot under Login Items in System Settings." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erlaube Mixpilot in den Systemeinstellungen unter „Anmeldeobjekte“."
+          }
+        }
+      }
+    },
+    "Allowed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erlaubt"
+          }
+        }
+      }
+    },
+    "Answer the question from macOS." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beantworte die Frage von macOS."
+          }
+        }
+      }
+    },
+    "Apps" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apps"
           }
         }
       }
@@ -31,12 +111,162 @@
         }
       }
     },
+    "Browsers count when a website uses the microphone, as in a video call." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Browser zählen, wenn eine Website das Mikrofon verwendet, etwa bei einem Videoanruf."
+          }
+        }
+      }
+    },
     "Call Mode" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Anrufmodus"
+          }
+        }
+      }
+    },
+    "Call mode turns on by itself when a call app uses the microphone. You can always turn it on or off in the menu bar." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Anrufmodus schaltet sich von selbst ein, wenn eine Anruf-App das Mikrofon verwendet. In der Menüleiste kannst du ihn jederzeit ein- oder ausschalten."
+          }
+        }
+      }
+    },
+    "Calls" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anrufe"
+          }
+        }
+      }
+    },
+    "Calls Come First" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anrufe haben Vorrang"
+          }
+        }
+      }
+    },
+    "Changes the volume of the app you’re using in steps of 10 %, up to its own level. Shortcuts work in every app." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ändert die Lautstärke der App, die du gerade verwendest, in Schritten von 10 %, bis zu ihrer eigenen Lautstärke. Kurzbefehle funktionieren in allen Apps."
+          }
+        }
+      }
+    },
+    "Continue" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fortfahren"
+          }
+        }
+      }
+    },
+    "Detect Calls In" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anrufe erkennen in"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fertig"
+          }
+        }
+      }
+    },
+    "Every app plays at its own volume and on its own output again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Apps spielen wieder mit ihrer eigenen Lautstärke und über ihre eigene Ausgabe."
+          }
+        }
+      }
+    },
+    "Forget" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vergessen"
+          }
+        }
+      }
+    },
+    "Forget %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ vergessen"
+          }
+        }
+      }
+    },
+    "Forget All" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle vergessen"
+          }
+        }
+      }
+    },
+    "Forget All Apps?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Apps vergessen?"
+          }
+        }
+      }
+    },
+    "Forget All…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle vergessen …"
+          }
+        }
+      }
+    },
+    "General" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allgemein"
           }
         }
       }
@@ -71,6 +301,16 @@
         }
       }
     },
+    "Lower Other Apps During Calls" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Andere Apps bei Anrufen leiser machen"
+          }
+        }
+      }
+    },
     "Lowered" : {
       "localizations" : {
         "de" : {
@@ -97,6 +337,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mikrofon"
+          }
+        }
+      }
+    },
+    "Mixpilot is in the menu bar. Click %@ to change the volume of each app. You can set keyboard shortcuts in Settings." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mixpilot befindet sich in der Menüleiste. Klicke auf %@, um die Lautstärke jeder App zu ändern. Tastaturkurzbefehle kannst du in den Einstellungen festlegen."
+          }
+        }
+      }
+    },
+    "Mixpilot uses these settings whenever the app plays sound." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mixpilot verwendet diese Einstellungen, sobald die App Ton wiedergibt."
           }
         }
       }
@@ -141,6 +401,26 @@
         }
       }
     },
+    "Muted" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton aus"
+          }
+        }
+      }
+    },
+    "Needed to change the volume of apps. Sound is processed on your Mac and is never saved or sent." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erforderlich, um die Lautstärke von Apps zu ändern. Der Ton wird auf deinem Mac verarbeitet und weder gespeichert noch gesendet."
+          }
+        }
+      }
+    },
     "No Apps Playing Sound" : {
       "localizations" : {
         "de" : {
@@ -157,6 +437,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kein Mikrofon"
+          }
+        }
+      }
+    },
+    "No Remembered Apps" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine gemerkten Apps"
+          }
+        }
+      }
+    },
+    "Not Now" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht jetzt"
           }
         }
       }
@@ -201,6 +501,26 @@
         }
       }
     },
+    "Open at Login" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bei der Anmeldung öffnen"
+          }
+        }
+      }
+    },
+    "Other Output" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Andere Ausgabe"
+          }
+        }
+      }
+    },
     "Output" : {
       "localizations" : {
         "de" : {
@@ -221,6 +541,16 @@
         }
       }
     },
+    "Permissions" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Berechtigungen"
+          }
+        }
+      }
+    },
     "Quit Mixpilot" : {
       "localizations" : {
         "de" : {
@@ -231,12 +561,142 @@
         }
       }
     },
+    "See which apps use it, and turn it off for all of them at once." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sieh, welche Apps es verwenden, und schalte es für alle auf einmal aus."
+          }
+        }
+      }
+    },
+    "Set the volume of each app, and keep your calls clear." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stelle die Lautstärke jeder App ein und höre deine Anrufe klar."
+          }
+        }
+      }
+    },
+    "Settings…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einstellungen …"
+          }
+        }
+      }
+    },
+    "Shortcuts" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kurzbefehle"
+          }
+        }
+      }
+    },
+    "Show in Menu Bar" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In der Menüleiste anzeigen"
+          }
+        }
+      }
+    },
+    "System Audio Recording" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Systemaudioaufnahme"
+          }
+        }
+      }
+    },
+    "Their own volume stays as you set it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ihre eigene Lautstärke bleibt, wie du sie eingestellt hast."
+          }
+        }
+      }
+    },
+    "To change an app’s volume, Mixpilot needs the sound it plays. macOS calls this System Audio Recording. Sound is processed on your Mac and is never saved or sent." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um die Lautstärke einer App zu ändern, braucht Mixpilot den Ton, den sie wiedergibt. macOS nennt das „Systemaudioaufnahme“. Der Ton wird auf deinem Mac verarbeitet und weder gespeichert noch gesendet."
+          }
+        }
+      }
+    },
     "To change the volume of apps, allow Mixpilot to record system audio." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Erlaube Mixpilot die Systemaudioaufnahme, damit du die Lautstärke von Apps ändern kannst."
+          }
+        }
+      }
+    },
+    "Turn Call Mode On or Off" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anrufmodus ein- oder ausschalten"
+          }
+        }
+      }
+    },
+    "Turn Down the App in Front" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App im Vordergrund leiser machen"
+          }
+        }
+      }
+    },
+    "Turn Microphone On or Off" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mikrofon ein- oder ausschalten"
+          }
+        }
+      }
+    },
+    "Turn Up the App in Front" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App im Vordergrund lauter machen"
+          }
+        }
+      }
+    },
+    "Turn any app down, or send it to other speakers or headphones." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mach jede App leiser oder schick sie an andere Lautsprecher oder Kopfhörer."
           }
         }
       }
@@ -271,12 +731,112 @@
         }
       }
     },
+    "Version" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        }
+      }
+    },
     "Volume" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lautstärke"
+          }
+        }
+      }
+    },
+    "Volume for Each App" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lautstärke für jede App"
+          }
+        }
+      }
+    },
+    "Volume of Other Apps" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lautstärke anderer Apps"
+          }
+        }
+      }
+    },
+    "Welcome to Mixpilot" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Willkommen bei Mixpilot"
+          }
+        }
+      }
+    },
+    "When a call starts, other apps get quieter by themselves." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn ein Anruf beginnt, werden andere Apps von selbst leiser."
+          }
+        }
+      }
+    },
+    "When it’s hidden, open Mixpilot again to see these settings. Your shortcuts keep working." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn Mixpilot ausgeblendet ist, öffne die App erneut, um diese Einstellungen zu sehen. Deine Kurzbefehle funktionieren weiterhin."
+          }
+        }
+      }
+    },
+    "When you change an app’s volume or output, Mixpilot remembers it and uses it again the next time the app plays sound." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn du die Lautstärke oder Ausgabe einer App änderst, merkt sich Mixpilot das und verwendet es wieder, sobald die App das nächste Mal Ton wiedergibt."
+          }
+        }
+      }
+    },
+    "You can allow it later in System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du kannst es später in den Systemeinstellungen unter „Datenschutz & Sicherheit“ ▸ „Bildschirm- & Systemaudioaufnahme“ erlauben."
+          }
+        }
+      }
+    },
+    "Your Microphone at a Glance" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Mikrofon auf einen Blick"
+          }
+        }
+      }
+    },
+    "You’re All Set" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alles bereit"
           }
         }
       }

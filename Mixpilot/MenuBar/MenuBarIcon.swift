@@ -6,8 +6,22 @@ import SwiftUI
 /// microphone is off and when call mode is on, so neither is ever invisible.
 struct MenuBarIcon: View {
     let model: MixerModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        icon
+            .task {
+                // The icon is on screen from launch, so it opens the welcome window the first time.
+                guard !UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") else { return }
+                #if DEBUG
+                guard !SnapshotRenderer.isRequested else { return }
+                #endif
+                openWindow(id: WindowID.onboarding)
+                NSApp.activate()
+            }
+    }
+
+    @ViewBuilder private var icon: some View {
         if model.microphone.isMuted {
             Image(systemName: "mic.slash")
                 .accessibilityLabel(Text("Mixpilot, Microphone Off"))

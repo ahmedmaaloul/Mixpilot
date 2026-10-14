@@ -1,0 +1,26 @@
+{
+  "fill" : {
+    "automatic-gradient" : "extended-srgb:0.34000,0.30000,0.92000,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        { "glass" : true, "image-name" : "Knobs.svg", "name" : "Knobs" }
+      ],
+      "name" : "Knobs",
+      "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
+      "translucency" : { "enabled" : true, "value" : 0.15 }
+    },
+    {
+      "layers" : [
+        { "glass" : true, "image-name" : "Tracks.svg", "name" : "Tracks" }
+      ],
+      "name" : "Tracks",
+      "shadow" : { "kind" : "neutral", "opacity" : 0.4 },
+      "translucency" : { "enabled" : true, "value" : 0.5 }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : "shared"
+  }
+}

@@ -3,19 +3,24 @@
 A macOS menu bar app that sets the volume of each app separately, like the volume mixer on Windows.
 Main use case: during a call, keep the call loud and everything else quiet. English and German,
 following the system language. Distributed outside the App Store (Developer ID, notarized).
-macOS 14.4 or newer. One dependency, approved by the user: KeyboardShortcuts (from M5).
+macOS 14.4 or newer. One dependency, approved by the user: KeyboardShortcuts 3.1.0 (see Dependencies).
 
 ## Layout
 
 ```
-Mixpilot.xcodeproj           Open this. App target + local package reference.
+Mixpilot.xcodeproj           Open this. App target, local package, KeyboardShortcuts (exact 3.1.0).
+                             Package.resolved is committed (project.xcworkspace/xcshareddata/swiftpm).
 Config/Base.xcconfig         Bundle ID base (app.mixpilot → app.mixpilot.mac), team, version.
 Info.plist                   Partial plist (usage descriptions); the rest comes from build settings.
 Mixpilot/                    App target (UI and wiring only), folder-synchronized group
   App/                       @main + AppDelegate, MixerModel (state for the UI), AppDirectory (names,
                              icons), PreviewData, SnapshotRenderer (debug: previews → PNG)
   MenuBar/                   MixerPanel (the window-style menu bar extra), AppRow, MenuBarIcon
-  Resources/                 Localizable.xcstrings, InfoPlist.xcstrings, AppIcon.icon
+  Settings/                  SettingsView (General, Calls, Apps, Shortcuts panes), LoginItem,
+                             Shortcuts (names + handlers), AppWindows (open Settings, About + credits)
+  Onboarding/                OnboardingView (welcome → permission → done)
+  Resources/                 Localizable.xcstrings, InfoPlist.xcstrings, AppIcon.icon (Icon Composer),
+                             PrivacyInfo.xcprivacy (UserDefaults CA92.1, systemUptime 35F9.1)
 MixpilotKit/                 Swift package, no UI
   Sources/MixpilotCore/      Pure logic, fully tested: AppGrouper, Linger, AppAudioSettings,
                              AppSettingsStore, OutputDevice (+ kind), TapPlanner, CallMode + KnownCallApps
@@ -27,9 +32,10 @@ MixpilotKit/                 Swift package, no UI
   Tests/MixpilotCoreTests/   Swift Testing: grouping, linger, tap planning, settings storage, device kinds,
                              call detection
   Tests/MixpilotRenderTests/ Swift Testing against the C kernel with synthetic buffers
-Localization/                de.py (German table, source of truth) + localize.py (sync + fill + check)
-scripts/                     build.sh, run.sh, snapshots.sh, debug-volume.swift (set an app's volume in
-                             a debug build without the panel), release-mac.sh (M5)
+Localization/                de.py (German table, source of truth) + localize.py (sync + fill + check);
+                             KeyboardShortcuts/de.lproj: our German for the dependency's recorder
+scripts/                     build.sh, run.sh, snapshots.sh, debug-volume.swift (drive a debug build
+                             without the panel), localize-dependencies.sh (build phase), release-mac.sh
 ```
 
 The `.xcodeproj` uses folder-synchronized groups: any file under `Mixpilot/` is in the target
@@ -191,6 +197,15 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
   German "Systemeinstellung verwenden".
 - `avconferenced` and TelephonyUtilities are listed in `NSWorkspace.runningApplications`
   (background-only), so a plain "own PID is an app" rule would show them as rows.
+- TCC asks the *responsible* process: a binary started from a terminal
+  (`Mixpilot.app/Contents/MacOS/Mixpilot …`) is checked against the terminal's permission, not
+  Mixpilot's. Always `open` the app to test permissions; snapshots (started that way) show the
+  permission as missing.
+- Mic Modes (Standard / Voice Isolation / Wide Spectrum) are per app, set by the user in Control
+  Center; no public API reads or sets another app's mode, so Mixpilot doesn't offer it. The mic mute
+  (device level, before any app's processing) and the input volume (the device's hardware level,
+  like Sound settings) don't change the chosen mode. Apps with voice processing may also make macOS
+  lower other audio during calls, which stacks with call mode.
 - The built-in microphone has a settable input mute (`kAudioDevicePropertyMute`, input scope, main
   element); after `kill -9` it stays muted until Mixpilot runs again (hence launch at login, M5).
 
@@ -237,11 +252,53 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
 - Commit and push each finished step; commits use the GitHub noreply address (set in this repo).
 - No third-party dependencies beyond KeyboardShortcuts without asking the user.
 
-## Release (M5)
+## App shell (M5)
 
-Like Handpilot's `scripts/release-mac.sh`: archive → export developer-id → DMG → sign → notarize
-(`--keychain-profile handpilot`) → staple → `spctl` check. Download: mixpilot.blitzraum.com
-(Vercel). Support: support@blitzraum.com.
+- **Settings**: SwiftUI `Settings` scene, `TabView` panes (General, Calls, Apps, Shortcuts) with
+  `.formStyle(.grouped)`; the last pane is remembered (`@AppStorage("settingsPane")`). From views:
+  `@Environment(\.openSettings)` + `NSApp.activate()`. From AppKit (reopen): `AppWindows.openSettings()`
+  presses the hidden app menu's ⌘, item (`showSettingsWindow:` no longer opens SwiftUI Settings).
+- **Show in Menu Bar** (`@AppStorage("showInMenuBar")`) drives `MenuBarExtra(isInserted:)`.
+  `applicationShouldHandleReopen` opens Settings, so a hidden icon is never a dead end.
+- **Open at Login**: `SMAppService.mainApp` (`LoginItem`), with "Open System Settings" when macOS
+  wants approval.
+- **Onboarding**: `Window` scene, opened from `MenuBarIcon.task` while `hasCompletedOnboarding` is
+  false. Permission step: `AudioPermission.request()` starts an unmuted global tap with a silent
+  IOProc (nothing anyone hears changes) to make macOS ask, then polls `AudioPermission.isGranted()`.
+- **Shortcuts** (KeyboardShortcuts names in `Shortcuts.swift`): none set by default. Microphone and
+  call mode toggle on key up; volume up/down of the frontmost app in 10 % steps on key down, capped at
+  the app's own level. No volume HUD exists for one app: VoiceOver gets an announcement.
+- **About**: standard About panel with the KeyboardShortcuts MIT notice as credits (`AppWindows`).
+- **App icon**: `Resources/AppIcon.icon` (Icon Composer): indigo automatic gradient; "Tracks" (three
+  translucent rounded bars) and "Knobs" (three white capsules) as glass layers; the first group in
+  `icon.json` is in front. Preview: `"/Applications/Xcode.app/Contents/Applications/Icon Composer.app/
+  Contents/Executables/ictool" Mixpilot/Resources/AppIcon.icon --export-image --output-file out.png
+  --platform macOS --rendition Default|Dark|TintedDark|ClearLight --width 512 --height 512 --scale 1`.
+
+## Dependencies
+
+**KeyboardShortcuts 3.1.0** (sindresorhus, MIT), commit 772133d, pinned with `exactVersion`.
+Reviewed line by line before adding (Oct 2026): no network, no private API, no keystroke logging;
+global hotkeys through Carbon `RegisterEventHotKey` (no Accessibility/Input Monitoring permission);
+stores `KeyboardShortcuts_<name>` JSON in UserDefaults; the recorder is a real `NSSearchField`;
+Release builds fine at our 14.4 target (it uses `isolated deinit`).
+- Its strings come from its own bundle. The "Fix Dependency Localizations" build phase
+  (`scripts/localize-dependencies.sh`, so the target has `ENABLE_USER_SCRIPT_SANDBOXING = NO`)
+  replaces its German with `Localization/KeyboardShortcuts/de.lproj` (Apple's terms; the placeholder
+  must fit the field's 126 pt text area: "Kurzbefehl festlegen") and deletes every other language, so
+  the recorder never shows a language the rest of the app doesn't.
+- The MIT notice must stay in the About credits (`AppWindows.acknowledgements`).
+- To update: read the new release's source, bump `version` in `project.pbxproj`, resolve, compare its
+  en.lproj keys with ours, check the placeholder width, build Release, test the recorder in German.
+- Any other dependency needs the user's approval first.
+
+## Release
+
+`scripts/release-mac.sh` (like Handpilot's): localize + package tests → archive → export
+developer-id → hardened-runtime check → DMG → sign → notarize (`--keychain-profile handpilot`) →
+staple → `spctl`. `--test` runs everything locally with the development certificate and no
+notarization (verified). Bump `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` in `Config/Base.xcconfig`
+first. Download: mixpilot.blitzraum.com (Vercel). Support: support@blitzraum.com.
 
 ## Milestones
 
@@ -250,4 +307,5 @@ Like Handpilot's `scripts/release-mac.sh`: archive → export developer-id → D
 3. ✅ Per-app output device, saved settings, device-change handling. (Boost above 100 % was built,
    then removed at the user's request.)
 4. ✅ Call detection and automatic lowering, microphone section.
-5. Shortcuts, launch at login, settings window, onboarding, full English and German, app icon.
+5. ✅ Shortcuts, launch at login, settings window, onboarding, full English and German, app icon,
+   privacy manifest, release script.

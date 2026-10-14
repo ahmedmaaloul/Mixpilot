@@ -30,4 +30,14 @@ final class AppDirectory {
         cache[app.id] = identity
         return identity
     }
+
+    /// For apps that may not be running (remembered apps, call apps in Settings).
+    func identity(forBundleID bundleID: String) -> Identity {
+        identity(for: AudioApp(id: bundleID, bundleID: bundleID, pids: [], processObjectIDs: [], isPlaying: false, isUsingMicrophone: false))
+    }
+
+    /// Whether an app with this bundle ID is installed.
+    static func isInstalled(_ bundleID: String) -> Bool {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) != nil
+    }
 }

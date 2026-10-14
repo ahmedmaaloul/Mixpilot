@@ -22,6 +22,8 @@ case "device":
     info["device"] = arguments[2]
 case "callmode":
     info["callMode"] = arguments.count == 3 && arguments[2] == "on"
+case "permission":
+    info["probePermission"] = true
 case "mic":
     info["micMuted"] = arguments.count == 3 && arguments[2] == "mute"
 default:

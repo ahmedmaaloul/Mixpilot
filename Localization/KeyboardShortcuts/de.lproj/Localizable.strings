@@ -1,0 +1,13 @@
+/* German for the KeyboardShortcuts package (3.1.0), in Apple's own terms (Tastaturkurzbefehl,
+   informal "du", „…“). scripts/localize-dependencies.sh copies this over the package's version
+   in the built app. Keep the keys in sync with the package's en.lproj when updating it. */
+"record_shortcut" = "Kurzbefehl festlegen";
+"press_shortcut" = "Kurzbefehl drücken";
+"keyboard_shortcut_used_by_menu_item" = "Dieser Tastaturkurzbefehl kann nicht verwendet werden, da er bereits vom Menübefehl „%@“ verwendet wird.";
+"keyboard_shortcut_used_by_system" = "Dieser Tastaturkurzbefehl kann nicht verwendet werden, da er bereits systemweit verwendet wird.";
+"keyboard_shortcuts_can_be_changed" = "Die meisten systemweiten Tastaturkurzbefehle kannst du unter „Systemeinstellungen › Tastatur › Tastaturkurzbefehle“ ändern.";
+"keyboard_shortcut_disallowed" = "Die Wahltaste muss mit der Befehlstaste oder der Control-Taste kombiniert werden.";
+"clear_shortcut" = "Kurzbefehl löschen";
+"force_use_shortcut" = "Trotzdem verwenden";
+"ok" = "OK";
+"space_key" = "Leertaste";

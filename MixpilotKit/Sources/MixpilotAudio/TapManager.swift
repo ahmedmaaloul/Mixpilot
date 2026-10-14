@@ -310,7 +310,7 @@ public final class TapManager: @unchecked Sendable {
         permissionRetry?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.isPermissionDenied else { return }
-            if Self.hasPermission() {
+            if AudioPermission.isGranted() {
                 self.log.notice("Audio capture permission granted")
                 self.isPermissionDenied = false
                 self.continuation.yield(.permissionGranted)
@@ -321,23 +321,6 @@ public final class TapManager: @unchecked Sendable {
         }
         permissionRetry = work
         queue.asyncAfter(deadline: .now() + 3, execute: work)
-    }
-
-    /// Probes the permission with a tap that mutes nothing and is never read.
-    private static func hasPermission() -> Bool {
-        let description = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
-        description.isPrivate = true
-        description.muteBehavior = .unmuted
-        description.name = TapSession.tapNamePrefix + "permission check"
-        var tap = AudioObjectID(kAudioObjectUnknown)
-        guard AudioHardwareCreateProcessTap(description, &tap) == noErr else { return false }
-        defer { AudioHardwareDestroyProcessTap(tap) }
-        var address = HAL.address(kAudioTapPropertyDescription)
-        var reference = Unmanaged.passUnretained(description)
-        let status = AudioObjectSetPropertyData(
-            tap, &address, 0, nil, UInt32(MemoryLayout<Unmanaged<CATapDescription>>.size), &reference
-        )
-        return status != kAudioDevicePermissionsError
     }
 
     // MARK: Health
