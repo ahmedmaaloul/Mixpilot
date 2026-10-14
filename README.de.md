@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://mixpilot.blitzraum.com/de/"><b>Website und Download</b></a> ·
+  <a href="https://mixpilot.blitzraum.com/de"><b>Website und Download</b></a> ·
   <a href="README.md">English</a>
 </p>
 
@@ -38,7 +38,7 @@
 
 ## Installation
 
-Lade das Disk-Image von [mixpilot.blitzraum.com](https://mixpilot.blitzraum.com/de/), öffne es und
+Lade das Disk-Image von [mixpilot.blitzraum.com](https://mixpilot.blitzraum.com/de), öffne es und
 zieh Mixpilot in den Ordner „Programme“. Die App ist mit einer Developer ID signiert und von Apple
 beglaubigt.
 

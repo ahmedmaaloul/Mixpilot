@@ -102,4 +102,4 @@ mkdir -p website/public/download
 cp "$DMG" website/public/download/Mixpilot.dmg
 python3 website/build.py >/dev/null
 echo "✓ Ready to publish: $DMG"
-echo "  Copied to website/public/download/Mixpilot.dmg; deploy the website to publish it.
+echo "  Copied to website/public/download/Mixpilot.dmg; deploy the website to publish it."

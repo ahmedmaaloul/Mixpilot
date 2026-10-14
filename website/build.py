@@ -185,8 +185,10 @@ ICONS = {
 
 
 def path_for(lang, page):
-    prefix = "" if lang == "en" else "/de"
-    return f"{prefix}/" if page == "index" else f"{prefix}/{page}"
+    """Paths without trailing slashes (vercel.json: trailingSlash false), so no redirects."""
+    if page == "index":
+        return "/" if lang == "en" else "/de"
+    return f"/{page}" if lang == "en" else f"/de/{page}"
 
 
 def head(lang, t, title, description, page):

@@ -17,3 +17,6 @@ __pycache__/
 
 # Local tool settings
 .claude/
+
+# Vercel project link (local)
+website/.vercel/

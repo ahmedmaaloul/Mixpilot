@@ -36,6 +36,10 @@ Localization/                de.py (German table, source of truth) + localize.py
                              KeyboardShortcuts/de.lproj: our German for the dependency's recorder
 scripts/                     build.sh, run.sh, snapshots.sh, debug-volume.swift (drive a debug build
                              without the panel), localize-dependencies.sh (build phase), release-mac.sh
+website/                     mixpilot.blitzraum.com: build.py (texts EN/DE) + assets/ → public/ (static)
+docs/images/                 Icon and screenshots for the README
+README.md, README.de.md      Project README in English and German
+LICENSE.md                   PolyForm Noncommercial 1.0.0 (commercial use only with the user's permission)
 ```
 
 The `.xcodeproj` uses folder-synchronized groups: any file under `Mixpilot/` is in the target
@@ -296,6 +300,29 @@ Release builds fine at our 14.4 target (it uses `isolated deinit`).
 - To update: read the new release's source, bump `version` in `project.pbxproj`, resolve, compare its
   en.lproj keys with ours, check the placeholder width, build Release, test the recorder in German.
 - Any other dependency needs the user's approval first.
+
+## Website
+
+`website/build.py` writes `website/public` (commit it): home, privacy, support in English (`/`) and
+German (`/de/`), a 404, sitemap and robots. Apple product-page style: system font, large tight
+headlines, light/dark from `prefers-color-scheme`, blue pill buttons, rounded tiles, the panel on a
+soft gradient "wallpaper". No JavaScript, no cookies, no web fonts; `website/vercel.json` sets a
+strict CSP and serves `public/`. The download is `public/download/Mixpilot.dmg` (written by the
+release script). Screenshots come from `scripts/snapshots.sh` (copy `build/snapshots/panel-*` to
+`website/assets/`). The user is in France: no German Impressum; French *mentions légales* for a
+non-professional individual can list just the host (offered, not added). The GitHub repo is private
+for now; its homepage points to the site. Deploy: from `website/`,
+`npx --yes vercel@60.1.3 deploy --prod` (project `mixpilot`, the user's Vercel login on this Mac).
+DNS: the user adds `mixpilot` → Vercel's CNAME at Spaceship.
+
+Snapshot rendering pitfalls (for pictures that look like a Mac in use):
+- `cacheDisplay` draws controls inactive. `SnapshotRenderer` shows a borderless key window and
+  captures it with `CGWindowListCreateImage` (own windows need no permission; the function is looked
+  up with `dlsym`, debug builds only).
+- A process started from a terminal is never activated; run it through `open` (the script does)
+  and switch to `.regular` activation policy. Sliders also need
+  `.environment(\.controlActiveState, .key)`. `NSSwitch` still draws its "on" state gray.
+- The default blue accent is forced with `.tint(systemBlue)` and the `routedTint` environment value.
 
 ## Release
 
