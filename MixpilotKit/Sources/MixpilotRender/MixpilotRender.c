@@ -9,10 +9,8 @@
 /// and slow enough that a jump from 100 % to 0 % doesn't click.
 static const double kRampTimeConstant = 0.015;
 
-/// The soft limiter leaves samples below this level untouched.
-static const float kLimiterThreshold = 0.9f;
-
-static const float kMaximumGain = 4.0f;
+/// Mixpilot only ever makes apps quieter: the audio thread never amplifies, whatever it is told.
+static const float kMaximumGain = 1.0f;
 
 struct MPRenderState {
     // Shared with the main thread.
@@ -97,16 +95,6 @@ static bool findChannel(const AudioBufferList *list, UInt32 index, Channel *chan
     return false;
 }
 
-/// Leaves quiet samples alone and bends louder ones smoothly towards ±1, so a boosted app gets
-/// louder without harsh clipping.
-static inline float softLimit(float sample) {
-    float magnitude = fabsf(sample);
-    if (magnitude <= kLimiterThreshold) return sample;
-    const float headroom = 1.0f - kLimiterThreshold;
-    float limited = kLimiterThreshold + headroom * tanhf((magnitude - kLimiterThreshold) / headroom);
-    return sample < 0 ? -limited : limited;
-}
-
 void MPRenderProcess(MPRenderState *state, const AudioBufferList *input, AudioBufferList *output) {
     atomic_fetch_add_explicit(&state->callbackCount, 1, memory_order_relaxed);
 
@@ -145,10 +133,6 @@ void MPRenderProcess(MPRenderState *state, const AudioBufferList *input, AudioBu
         sawSignal = sawSignal || l != 0.0f || r != 0.0f;
         l *= gain;
         r *= gain;
-        if (gain > 1.0f) {
-            l = softLimit(l);
-            r = softLimit(r);
-        }
         if (stereoOutput) {
             outLeft.data[frame * outLeft.stride] = l;
             outRight.data[frame * outRight.stride] = r;

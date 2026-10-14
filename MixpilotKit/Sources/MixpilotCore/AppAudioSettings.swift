@@ -1,7 +1,8 @@
 /// What a person set for one app: its volume, whether it is muted, and where it plays.
 public struct AppAudioSettings: Codable, Sendable, Hashable {
-    /// 0 = silent, 1 = as loud as the app plays it, up to 2 = boosted to 200 %.
-    public static let volumeRange: ClosedRange<Double> = 0...2
+    /// 0 = silent, 1 = as loud as the app plays it. Never above: Mixpilot only makes apps quieter,
+    /// to protect people's hearing and speakers.
+    public static let volumeRange: ClosedRange<Double> = 0...1
 
     public var volume: Double {
         didSet { volume = Self.clamped(volume) }
@@ -29,12 +30,6 @@ public struct AppAudioSettings: Codable, Sendable, Hashable {
     /// The gain applied to the app's sound.
     public var gain: Double {
         isMuted ? 0 : volume
-    }
-
-    /// Values within 3 % of 100 % become exactly 100 %, so dragging back to the middle tick really
-    /// gives the app its own level back (and releases it).
-    public static func snapped(_ volume: Double) -> Double {
-        abs(volume - 1) < 0.03 ? 1 : volume
     }
 
     static func clamped(_ volume: Double) -> Double {

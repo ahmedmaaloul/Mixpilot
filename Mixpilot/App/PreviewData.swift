@@ -16,7 +16,7 @@ enum PreviewData {
             row("com.apple.Music", path: "/System/Applications/Music.app", settings: AppAudioSettings(volume: 0.35)),
             row("com.apple.podcasts", path: "/System/Applications/Podcasts.app",
                 settings: AppAudioSettings(volume: 0.8, isMuted: true)),
-            row("com.apple.Safari", path: "/Applications/Safari.app", settings: AppAudioSettings(volume: 1.6)),
+            row("com.apple.Safari", path: "/Applications/Safari.app", settings: AppAudioSettings(volume: 0.6)),
         ]
         .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }

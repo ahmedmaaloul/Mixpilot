@@ -25,7 +25,8 @@ MPRenderState *_Nullable MPRenderStateCreate(float gain, double sampleRate);
 /// Frees the state. Only after the IOProc using it has been stopped and destroyed.
 void MPRenderStateDestroy(MPRenderState *_Nullable state);
 
-/// Sets the gain the audio thread ramps to (0 = silent, 1 = unchanged, up to 4). Any thread.
+/// Sets the gain the audio thread ramps to (0 = silent, 1 = unchanged). Values above 1 are
+/// clamped to 1: Mixpilot never amplifies. Any thread.
 void MPRenderSetGain(MPRenderState *_Nonnull state, float gain);
 
 /// The gain the audio thread ramps to.
@@ -38,8 +39,8 @@ bool MPRenderHasReceivedSignal(const MPRenderState *_Nonnull state);
 /// Number of times the audio thread has rendered (to tell whether IO is running).
 uint64_t MPRenderCallbackCount(const MPRenderState *_Nonnull state);
 
-/// Renders one buffer: reads the tap's stereo input, applies the smoothed gain (with a soft
-/// limiter above unity) and writes it to the output channels. Extra output channels are silenced;
+/// Renders one buffer: reads the tap's stereo input, applies the smoothed gain (never above 1)
+/// and writes it to the output channels. Extra output channels are silenced;
 /// a mono output gets the average of left and right. Buffers must be 32-bit float, interleaved or
 /// not. Real-time safe.
 void MPRenderProcess(MPRenderState *_Nonnull state,

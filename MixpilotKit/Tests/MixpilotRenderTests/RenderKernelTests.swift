@@ -148,17 +148,18 @@ struct RenderKernelTests {
         #expect(output.sample(0, channel: 1) == 0.25)
     }
 
-    @Test func boostIsLinearBelowTheLimiterAndSoftAbove() throws {
+    @Test func neverAmplifies() throws {
+        // Even if asked for more, the output is never louder than the app's own sound.
         let state = try #require(MPRenderStateCreate(2, rate))
         defer { MPRenderStateDestroy(state) }
+        #expect(MPRenderTargetGain(state) == 1)
+        MPRenderSetGain(state, 3)
         let input = Buffers(frames: 4, channelsPerBuffer: [2]) { frame, _ in [0.3, 0.8, -0.8, 1][frame] }
         let output = Buffers(frames: 4, channelsPerBuffer: [2])
         render(state, input, output)
-        #expect(abs(output.sample(0, channel: 0) - 0.6) < 1e-6)
-        let loud = output.sample(1, channel: 0)
-        #expect(loud > 0.9 && loud < 1)
-        #expect(output.sample(2, channel: 0) == -loud)
-        #expect(output.sample(3, channel: 0) <= 1)
+        for frame in 0..<4 {
+            #expect(output.sample(frame, channel: 0) == input.sample(frame, channel: 0))
+        }
     }
 
     @Test func signalIsDetectedOnlyForNonZeroInput() throws {
@@ -179,7 +180,7 @@ struct RenderKernelTests {
         defer { MPRenderStateDestroy(state) }
         #expect(MPRenderTargetGain(state) == 0)
         MPRenderSetGain(state, 100)
-        #expect(MPRenderTargetGain(state) == 4)
+        #expect(MPRenderTargetGain(state) == 1)
         MPRenderSetGain(state, -1)
         #expect(MPRenderTargetGain(state) == 0)
     }

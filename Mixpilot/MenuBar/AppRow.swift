@@ -2,7 +2,7 @@ import MixpilotCore
 import SwiftUI
 
 /// One app in the panel: icon, name and output device, then its volume: a mute button showing
-/// the level, a slider from 0 to 200 % with a tick at 100 %, and the percentage.
+/// the level, a slider from 0 to 100 % (the app's own level), and the percentage.
 struct AppRow: View {
     let app: AppRowState
     var devices: [OutputDevice] = []
@@ -62,32 +62,20 @@ struct AppRow: View {
     }
 }
 
-/// The volume slider. On macOS 26 and later it has a tick at 100 %; values close to 100 % snap
-/// to it so the app's own level is easy to get back.
+/// The volume slider: 0 % to 100 %, where 100 % is the app's own level.
 private struct VolumeSlider: View {
     let value: Double
     let percent: String
     let onChange: @MainActor (Double) -> Void
 
     var body: some View {
-        let binding = Binding(get: { value }, set: { onChange($0) })
-        Group {
-            if #available(macOS 26.0, *) {
-                Slider(value: binding, in: AppAudioSettings.volumeRange) {
-                    Text("Volume")
-                } ticks: {
-                    SliderTick(1.0)
-                }
-            } else {
-                Slider(value: binding, in: AppAudioSettings.volumeRange) {
-                    Text("Volume")
-                }
-            }
+        Slider(value: Binding(get: { value }, set: { onChange($0) }), in: AppAudioSettings.volumeRange) {
+            Text("Volume")
         }
         .labelsHidden()
         .accessibilityValue(Text(percent))
         .accessibilityAdjustableAction { direction in
-            // 5 % per step; the default would be a tenth of the 0–200 % range.
+            // 5 % per step, like the system volume keys with Option and Shift.
             switch direction {
             case .increment: onChange(value + 0.05)
             case .decrement: onChange(value - 0.05)

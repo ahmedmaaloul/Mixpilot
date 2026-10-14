@@ -19,7 +19,7 @@ Mixpilot/                    App target (UI and wiring only), folder-synchronize
 MixpilotKit/                 Swift package, no UI
   Sources/MixpilotCore/      Pure logic, fully tested: AppGrouper, Linger, AppAudioSettings,
                              AppSettingsStore, OutputDevice (+ kind), TapPlanner (later: call detector)
-  Sources/MixpilotRender/    C: the audio thread's code (MPRenderIOProc, gain ramp, soft limiter)
+  Sources/MixpilotRender/    C: the audio thread's code (MPRenderIOProc, gain ramp, gain capped at 1)
   Sources/MixpilotAudio/     Core Audio HAL: HAL helpers, ProcessMonitor, DeviceMonitor, Responsibility
                              (private SPI), AudioDevices, TapSession (+ Output), TapManager
   Tests/MixpilotCoreTests/   Swift Testing: grouping, linger, tap planning, settings storage, device kinds
@@ -84,8 +84,10 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
   "AirPods Pro (Not Connected)") per bundle ID as JSON in UserDefaults (`appAudioSettings.v1`).
   Unchanged apps and `pid:` IDs aren't stored; loading is lenient (bad values repaired or dropped).
   Settings apply as soon as the app shows up in Core Audio again.
-- **Volume**: 0–200 %. The kernel's soft limiter bends samples above 0.9 when gain > 1. Values within
-  3 % of 100 % snap to 100 % (releases the tap). macOS 26+: `SliderTick(1.0)`; earlier: plain slider.
+- **Volume**: 0–100 %, where 100 % is the app's own level. **No boost, by the user's decision: Mixpilot
+  only makes apps quieter, to protect hearing and speakers ("we are not Windows").** Enforced twice:
+  `AppAudioSettings.volumeRange` is 0…1 (stored values above are clamped on load) and the C kernel
+  clamps every gain to 1. Don't add amplification back without asking.
 - **Fail open**: on any error the session is destroyed and the app is blocked for 10 s;
   `.mutedWhenTapped` then gives the app its sound back. Permission: 2 s after a start with only
   silence, rewrite the tap description; `kAudioDevicePermissionsError` → release everything, show the
@@ -218,6 +220,7 @@ Like Handpilot's `scripts/release-mac.sh`: archive → export developer-id → D
 
 1. ✅ List apps producing audio, live updating, in a native menu bar panel.
 2. ✅ Per-app volume and mute with process taps, clean teardown.
-3. ✅ Boost above 100 %, per-app output device, saved settings, device-change handling.
+3. ✅ Per-app output device, saved settings, device-change handling. (Boost above 100 % was built,
+   then removed at the user's request.)
 4. Call detection and automatic lowering, microphone section.
 5. Shortcuts, launch at login, settings window, onboarding, full English and German, app icon.

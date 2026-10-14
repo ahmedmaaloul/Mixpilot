@@ -132,7 +132,7 @@ final class MixerModel {
 
     func setVolume(_ volume: Double, for appID: String) {
         change(appID) {
-            $0.volume = AppAudioSettings.snapped(volume)
+            $0.volume = volume
             // Moving the slider unmutes, as with the system volume.
             $0.isMuted = false
         }

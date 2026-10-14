@@ -76,7 +76,7 @@ struct AppSettingsStoreTests {
         let temporary = TemporaryDefaults()
         let json = """
         {
-          "too.loud": {"volume": 9, "isMuted": false},
+          "too.loud": {"volume": 1.6, "isMuted": false},
           "negative": {"volume": -1},
           "only.muted": {"isMuted": true, "futureField": 42},
           "empty.device": {"volume": 0.5, "outputDeviceUID": ""},
@@ -86,7 +86,8 @@ struct AppSettingsStoreTests {
         """
         temporary.defaults.set(Data(json.utf8), forKey: AppSettingsStore.defaultsKey)
         let store = AppSettingsStore(defaults: temporary.defaults)
-        #expect(store["too.loud"].volume == 2)
+        // Boosted values from early builds come back at 100 %.
+        #expect(store.all["too.loud"] == nil)
         #expect(store["negative"].volume == 0)
         #expect(store["only.muted"] == AppAudioSettings(volume: 1, isMuted: true))
         #expect(store["empty.device"].outputDeviceUID == nil)
@@ -106,24 +107,22 @@ struct AppSettingsStoreTests {
 struct AppAudioSettingsTests {
     @Test func gainFollowsMute() {
         #expect(AppAudioSettings(volume: 0.7).gain == 0.7)
-        #expect(AppAudioSettings(volume: 1.5, isMuted: true).gain == 0)
+        #expect(AppAudioSettings(volume: 0.5, isMuted: true).gain == 0)
         #expect(AppAudioSettings.unchanged.gain == 1)
     }
 
     @Test func volumeIsClamped() {
-        #expect(AppAudioSettings(volume: 3).volume == 2)
+        #expect(AppAudioSettings(volume: 3).volume == 1)
         #expect(AppAudioSettings(volume: -0.5).volume == 0)
         #expect(AppAudioSettings(volume: .nan).volume == 1)
         var settings = AppAudioSettings()
         settings.volume = 5
-        #expect(settings.volume == 2)
+        #expect(settings.volume == 1)
     }
 
-    @Test func valuesNearFullVolumeSnapToIt() {
-        #expect(AppAudioSettings.snapped(0.98) == 1)
-        #expect(AppAudioSettings.snapped(1.02) == 1)
-        #expect(AppAudioSettings.snapped(0.96) == 0.96)
-        #expect(AppAudioSettings.snapped(1.5) == 1.5)
+    @Test func neverLouderThanTheAppItself() {
+        #expect(AppAudioSettings.volumeRange.upperBound == 1)
+        #expect(AppAudioSettings(volume: 1.5).gain == 1)
     }
 
     @Test func aChosenDeviceIsAChange() {
