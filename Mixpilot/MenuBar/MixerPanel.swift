@@ -81,8 +81,11 @@ private struct AppList: View {
                 ForEach(model.apps) { app in
                     AppRow(
                         app: app,
+                        devices: model.outputDevices,
+                        defaultOutputUID: model.defaultOutputUID,
                         onVolumeChange: { model.setVolume($0, for: app.id) },
-                        onMuteChange: { model.setMuted($0, for: app.id) }
+                        onMuteChange: { model.setMuted($0, for: app.id) },
+                        onOutputChange: { model.setOutputDevice($0, for: app.id) }
                     )
                 }
             }
@@ -152,7 +155,7 @@ private struct NoAppsView: View {
 }
 
 #Preview("Permission Needed") {
-    MixerPanel(model: MixerModel(previewApps: PreviewData.apps, needsAudioPermission: true))
+    MixerPanel(model: MixerModel(previewApps: PreviewData.apps, devices: PreviewData.devices, needsAudioPermission: true))
 }
 
 #Preview("No Apps") {

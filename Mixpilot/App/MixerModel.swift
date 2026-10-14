@@ -12,62 +12,83 @@ struct AppRowState: Identifiable, Equatable {
     var icon: NSImage
     var isPlaying: Bool
     var isUsingMicrophone: Bool
-    /// 0…1 (boost above 1 arrives with M3).
-    var volume: Double = 1
-    var isMuted = false
+    /// Volume, mute and chosen output device.
+    var settings: AppAudioSettings = .unchanged
+    /// The device the app plays to on its own (Core Audio object ID), if it is playing.
+    var ownOutputDeviceID: UInt32?
 }
 
-/// The state behind the menu bar panel: which apps are playing sound, and their volumes.
+/// The state behind the menu bar panel: which apps are playing sound, their volumes and output
+/// devices, and the devices available.
 ///
 /// Turns `ProcessMonitor` snapshots into rows (helpers grouped under their app, a row kept for a
-/// few seconds after its app stops playing, sorted by name) and tells `TapManager` which apps
-/// need their volume changed.
+/// few seconds after its app stops playing, sorted by name), remembers each app's settings by
+/// bundle ID (`AppSettingsStore`) and tells `TapManager` what every app should sound like.
 @Observable
 final class MixerModel {
     private(set) var apps: [AppRowState] = []
+    private(set) var outputDevices: [OutputDevice] = []
+    private(set) var defaultOutputUID: String?
     /// Mixpilot can't change volumes until the System Audio Recording permission is allowed.
     private(set) var needsAudioPermission = false
 
     @ObservationIgnored private let monitor: ProcessMonitor?
+    @ObservationIgnored private let devices: DeviceMonitor?
     @ObservationIgnored private let taps: TapManager?
+    @ObservationIgnored private let store: AppSettingsStore?
     @ObservationIgnored private let directory = AppDirectory()
     @ObservationIgnored private let log = Logger(subsystem: "app.mixpilot.mac", category: "mixer")
     @ObservationIgnored private var linger = Linger<String>(duration: 3)
     @ObservationIgnored private var current: [String: AudioApp] = [:]
     @ObservationIgnored private var lastKnown: [String: AppRowState] = [:]
-    @ObservationIgnored private var volumes: [String: AppVolume] = [:]
-    @ObservationIgnored private var listenTask: Task<Void, Never>?
-    @ObservationIgnored private var eventTask: Task<Void, Never>?
+    /// Settings of every app, remembered ones included. Mirrors the store.
+    @ObservationIgnored private var settings: [String: AppAudioSettings] = [:]
+    @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     @ObservationIgnored private var expiryTask: Task<Void, Never>?
     @ObservationIgnored private var launchObserver: NSObjectProtocol?
 
     /// The live model. Call `start()` once the app has launched.
     init() {
         monitor = ProcessMonitor()
+        devices = DeviceMonitor()
         taps = TapManager()
+        let store = AppSettingsStore()
+        self.store = store
+        settings = store.all
     }
 
-    /// Fixed rows, for previews and snapshots. Never touches Core Audio.
-    init(previewApps: [AppRowState], needsAudioPermission: Bool = false) {
+    /// Fixed rows, for previews and snapshots. Never touches Core Audio or saved settings.
+    init(previewApps: [AppRowState], devices: [OutputDevice] = [], needsAudioPermission: Bool = false) {
         monitor = nil
+        self.devices = nil
         taps = nil
+        store = nil
         apps = previewApps
+        outputDevices = devices
+        defaultOutputUID = devices.first?.id
+        settings = Dictionary(uniqueKeysWithValues: previewApps.map { ($0.id, $0.settings) })
         self.needsAudioPermission = needsAudioPermission
     }
 
     func start() {
-        guard let monitor, let taps, listenTask == nil else { return }
+        guard let monitor, let devices, let taps, tasks.isEmpty else { return }
         monitor.start()
-        listenTask = Task { [weak self] in
+        devices.start()
+        tasks.append(Task { [weak self] in
             for await processes in monitor.processes {
                 self?.apply(processes)
             }
-        }
-        eventTask = Task { [weak self] in
+        })
+        tasks.append(Task { [weak self] in
+            for await snapshot in devices.snapshots {
+                self?.apply(snapshot)
+            }
+        })
+        tasks.append(Task { [weak self] in
             for await event in taps.events {
                 self?.needsAudioPermission = event == .permissionDenied
             }
-        }
+        })
         // A helper can show up in Core Audio before its app is known to the workspace; group
         // again when an app finishes launching.
         launchObserver = NSWorkspace.shared.notificationCenter.addObserver(
@@ -80,8 +101,8 @@ final class MixerModel {
     }
 
     #if DEBUG
-    /// Lets scripts change volumes without the panel (debug builds only):
-    /// `scripts/debug-volume.swift <bundle ID> <volume 0…1 | mute | unmute>`.
+    /// Lets scripts change an app without the panel (debug builds only):
+    /// `build/debug-volume <bundle ID> <0…2 | mute | unmute | device <UID | system>>`.
     func installDebugHooks() {
         DistributedNotificationCenter.default().addObserver(
             forName: Notification.Name("app.mixpilot.debug.volume"),
@@ -91,10 +112,12 @@ final class MixerModel {
             guard let info = notification.userInfo, let appID = info["app"] as? String else { return }
             let volume = info["volume"] as? Double
             let muted = info["muted"] as? Bool
+            let device = info["device"] as? String
             MainActor.assumeIsolated {
                 self?.log.info("Debug request for \(appID, privacy: .public)")
                 if let volume { self?.setVolume(volume, for: appID) }
                 if let muted { self?.setMuted(muted, for: appID) }
+                if let device { self?.setOutputDevice(device == "system" ? nil : device, for: appID) }
             }
         }
     }
@@ -105,48 +128,65 @@ final class MixerModel {
         taps?.stopAll()
     }
 
-    // MARK: - Volume
+    // MARK: - Changing an app's settings
 
     func setVolume(_ volume: Double, for appID: String) {
-        var setting = volumes[appID] ?? .unchanged
-        setting.volume = min(max(volume, 0), 1)
-        // Moving the slider unmutes, as with the system volume.
-        setting.isMuted = false
-        volumes[appID] = setting
-        updateRow(appID, with: setting)
-        sendTapRequests()
+        change(appID) {
+            $0.volume = AppAudioSettings.snapped(volume)
+            // Moving the slider unmutes, as with the system volume.
+            $0.isMuted = false
+        }
     }
 
     func setMuted(_ isMuted: Bool, for appID: String) {
-        var setting = volumes[appID] ?? .unchanged
-        setting.isMuted = isMuted
-        volumes[appID] = setting
-        updateRow(appID, with: setting)
-        sendTapRequests()
+        change(appID) { $0.isMuted = isMuted }
     }
 
-    private func updateRow(_ appID: String, with setting: AppVolume) {
-        guard let index = apps.firstIndex(where: { $0.id == appID }) else { return }
-        apps[index].volume = setting.volume
-        apps[index].isMuted = setting.isMuted
-        lastKnown[appID] = apps[index]
+    /// Plays the app on the given device (UID), or where it plays on its own for nil.
+    func setOutputDevice(_ uid: String?, for appID: String) {
+        let name = uid.flatMap { uid in outputDevices.first { $0.id == uid }?.name }
+        change(appID) {
+            $0.outputDeviceUID = uid
+            $0.outputDeviceName = name
+        }
+    }
+
+    private func change(_ appID: String, _ update: (inout AppAudioSettings) -> Void) {
+        var setting = settings[appID] ?? .unchanged
+        update(&setting)
+        settings[appID] = setting
+        store?.set(setting, for: appID)
+        if let index = apps.firstIndex(where: { $0.id == appID }) {
+            apps[index].settings = setting
+            lastKnown[appID] = apps[index]
+        }
+        sendTapRequests()
     }
 
     /// Tells the tap manager what every app Core Audio knows should sound like.
     private func sendTapRequests() {
         let requests = current.values.map { app in
-            TapRequest(
+            let setting = settings[app.id] ?? .unchanged
+            return TapRequest(
                 appID: app.id,
                 processObjectIDs: app.processObjectIDs,
-                gain: (volumes[app.id] ?? .unchanged).gain,
+                gain: setting.gain,
                 isPlaying: app.isPlaying,
-                outputDeviceIDs: app.outputDeviceIDs
+                outputDeviceIDs: app.outputDeviceIDs,
+                preferredOutputUID: setting.outputDeviceUID
             )
         }
         taps?.update(requests)
     }
 
-    // MARK: - Updating rows
+    // MARK: - Updating from Core Audio
+
+    private func apply(_ snapshot: DeviceSnapshot) {
+        outputDevices = snapshot.outputs
+        defaultOutputUID = snapshot.defaultOutputUID
+        // A chosen device may have connected or disconnected.
+        sendTapRequests()
+    }
 
     private func apply(_ processes: [AudioProcess]) {
         log.debug("Snapshot: \(processes.count) processes, \(processes.filter(\.isRunningOutput).count) playing")
@@ -170,7 +210,7 @@ final class MixerModel {
 
         var rows: [AppRowState] = []
         for id in visible {
-            let setting = volumes[id] ?? .unchanged
+            let setting = settings[id] ?? .unchanged
             if let app = current[id] {
                 let identity = directory.identity(for: app)
                 let row = AppRowState(
@@ -179,8 +219,8 @@ final class MixerModel {
                     icon: identity.icon,
                     isPlaying: app.isPlaying,
                     isUsingMicrophone: app.isUsingMicrophone,
-                    volume: setting.volume,
-                    isMuted: setting.isMuted
+                    settings: setting,
+                    ownOutputDeviceID: app.outputDeviceIDs.first
                 )
                 lastKnown[id] = row
                 rows.append(row)

@@ -16,6 +16,19 @@ enum AudioDevices {
         HAL.string(device, kAudioDevicePropertyDeviceUID)
     }
 
+    static func device(forUID uid: String) -> AudioObjectID? {
+        var address = HAL.address(kAudioHardwarePropertyTranslateUIDToDevice)
+        var cfUID = uid as CFString
+        var device = AudioObjectID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        let status = withUnsafeMutablePointer(to: &cfUID) { qualifier in
+            AudioObjectGetPropertyData(
+                HAL.systemObject, &address, UInt32(MemoryLayout<CFString>.size), qualifier, &size, &device
+            )
+        }
+        return status == noErr && device != kAudioObjectUnknown ? device : nil
+    }
+
     /// Whether the device has streams in the given scope (input or output).
     static func hasStreams(_ device: AudioObjectID, scope: AudioObjectPropertyScope) -> Bool {
         !HAL.objectIDs(device, kAudioDevicePropertyStreams, scope: scope).isEmpty

@@ -11,13 +11,24 @@ public struct TapRequest: Sendable, Equatable {
     public var isPlaying: Bool
     /// The devices the app plays to; empty if it isn't playing.
     public var outputDeviceIDs: [UInt32]
+    /// The device the person chose for the app (UID). Used while it is connected; otherwise the
+    /// app plays where it would on its own.
+    public var preferredOutputUID: String?
 
-    public init(appID: String, processObjectIDs: [UInt32], gain: Double, isPlaying: Bool, outputDeviceIDs: [UInt32]) {
+    public init(
+        appID: String,
+        processObjectIDs: [UInt32],
+        gain: Double,
+        isPlaying: Bool,
+        outputDeviceIDs: [UInt32],
+        preferredOutputUID: String? = nil
+    ) {
         self.appID = appID
         self.processObjectIDs = processObjectIDs
         self.gain = gain
         self.isPlaying = isPlaying
         self.outputDeviceIDs = outputDeviceIDs
+        self.preferredOutputUID = preferredOutputUID
     }
 }
 
@@ -47,9 +58,25 @@ public final class TapManager: @unchecked Sendable {
     private var isPermissionDenied = false
     private var deadline: DispatchWorkItem?
     private var permissionRetry: DispatchWorkItem?
+    /// Apps whose session is about to be rebuilt (coalesces bursts of device notifications).
+    private var pendingRebuilds: Set<String> = []
+    /// Recent rebuild times per app, to give up on an app that keeps failing.
+    private var rebuildTimes: [String: [Double]] = [:]
+    /// When each app's last session was released. A new tap for the same app is created only after
+    /// `recreateDelay`: creating one right after destroying the previous one blocks and fails.
+    private var releasedAt: [String: Double] = [:]
+    private var cooldownWork: DispatchWorkItem?
+    /// Render callback counts at the last watchdog check, per running session.
+    private var lastCallbackCounts: [String: UInt64] = [:]
+    private var watchdog: DispatchSourceTimer?
 
     /// After a failure, wait this long before trying the same app again.
     private static let failureBackoff: Double = 10
+    /// More rebuilds than this within `rebuildWindow` seconds count as a failure.
+    private static let maxRebuilds = 3
+    private static let rebuildWindow: Double = 10
+    private static let recreateDelay: Double = 1.5
+    private static let stallReason = "audio stalled"
     /// How long a started session may deliver only silence before the permission is checked.
     private static let signalTimeout: Double = 2
 
@@ -71,6 +98,8 @@ public final class TapManager: @unchecked Sendable {
         queue.sync {
             deadline?.cancel()
             permissionRetry?.cancel()
+            watchdog?.cancel()
+            watchdog = nil
             for session in sessions.values {
                 session.destroy()
             }
@@ -114,17 +143,25 @@ public final class TapManager: @unchecked Sendable {
             destroyAll()
             return
         }
+        let available = Set(DeviceMonitor.current().outputs.map(\.id))
         let targets = requests.map { request in
-            TapTarget(
+            let own = outputUID(for: request, default: defaultUID)
+            // The chosen device wins while it is connected.
+            let chosen = request.preferredOutputUID.flatMap { available.contains($0) ? $0 : nil }
+            return TapTarget(
                 appID: request.appID,
                 processObjectIDs: request.processObjectIDs,
                 gain: request.gain,
                 isPlaying: request.isPlaying,
-                outputDeviceUID: outputUID(for: request, default: defaultUID)
+                outputDeviceUID: chosen ?? own,
+                isRerouted: chosen.map { $0 != own } ?? false
             )
         }
         failedUntil = failedUntil.filter { $0.value > now }
-        let blocked = isPermissionDenied ? Set(targets.map(\.appID)) : Set(failedUntil.keys)
+        releasedAt = releasedAt.filter { now - $0.value < Self.recreateDelay }
+        let blocked = isPermissionDenied
+            ? Set(targets.map(\.appID))
+            : Set(failedUntil.keys).union(releasedAt.keys)
         let states = sessions.mapValues {
             TapSessionState(
                 processObjectIDs: $0.processObjectIDs,
@@ -139,6 +176,26 @@ public final class TapManager: @unchecked Sendable {
             apply(action, now: now)
         }
         scheduleDeadline()
+        scheduleCooldownEnd()
+        updateWatchdog()
+    }
+
+    /// Plans again when the earliest re-create delay ends, so a waiting app gets its session.
+    private func scheduleCooldownEnd() {
+        cooldownWork?.cancel()
+        guard let earliest = releasedAt.values.min() else { return }
+        let work = DispatchWorkItem { [weak self] in self?.reconcile() }
+        cooldownWork = work
+        let delay = max(0, earliest + Self.recreateDelay - ProcessInfo.processInfo.systemUptime) + 0.05
+        queue.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    /// Destroys an app's session and remembers when, for the re-create delay.
+    private func release(_ appID: String) {
+        guard let session = sessions.removeValue(forKey: appID) else { return }
+        session.destroy()
+        lastCallbackCounts[appID] = nil
+        releasedAt[appID] = ProcessInfo.processInfo.systemUptime
     }
 
     private func apply(_ action: TapAction, now: Double) {
@@ -153,6 +210,7 @@ public final class TapManager: @unchecked Sendable {
                     outputDeviceUID: target.outputDeviceUID
                 )
                 sessions[target.appID] = session
+                watchHealth(of: session)
                 if target.isPlaying {
                     try start(session)
                 }
@@ -162,8 +220,15 @@ public final class TapManager: @unchecked Sendable {
                 fail(target.appID, error, now: now)
             }
         case .destroy(let appID):
-            sessions.removeValue(forKey: appID)?.destroy()
+            release(appID)
             log.info("Released \(appID, privacy: .public)")
+        case .setOutput(let appID, let deviceUID):
+            do {
+                try sessions[appID]?.switchOutput(to: deviceUID)
+                log.info("Moved \(appID, privacy: .public) to \(deviceUID, privacy: .public)")
+            } catch {
+                fail(appID, error, now: now)
+            }
         case .setGain(let appID, let gain):
             guard let session = sessions[appID] else { return }
             session.setGain(gain)
@@ -184,6 +249,7 @@ public final class TapManager: @unchecked Sendable {
             }
         case .stop(let appID):
             sessions[appID]?.stop()
+            lastCallbackCounts[appID] = nil
             log.info("Paused \(appID, privacy: .public)")
         }
     }
@@ -255,17 +321,89 @@ public final class TapManager: @unchecked Sendable {
         return status != kAudioDevicePermissionsError
     }
 
+    // MARK: Health
+
+    private func watchHealth(of session: TapSession) {
+        let appID = session.appID
+        let identity = ObjectIdentifier(session)
+        session.watchHealth(queue: queue) { [weak self] in
+            guard let self, let current = self.sessions[appID], ObjectIdentifier(current) == identity,
+                  current.isBroken
+            else { return }
+            self.scheduleRebuild(appID, reason: "output device went away")
+        }
+    }
+
+    /// Rebuilds a session's output shortly (device changes come in bursts), keeping its tap. The
+    /// new output uses the device's and the tap's current formats.
+    private func scheduleRebuild(_ appID: String, reason: String) {
+        guard !pendingRebuilds.contains(appID) else { return }
+        pendingRebuilds.insert(appID)
+        queue.asyncAfter(deadline: .now() + 0.25) { [self] in
+            pendingRebuilds.remove(appID)
+            guard let session = sessions[appID] else { return }
+            let now = ProcessInfo.processInfo.systemUptime
+            let recent = (rebuildTimes[appID] ?? []).filter { now - $0 < Self.rebuildWindow } + [now]
+            rebuildTimes[appID] = recent
+            guard recent.count <= Self.maxRebuilds else {
+                // Keeps breaking: let the app play on its own for a while.
+                fail(appID, CoreAudioError(operation: "Too many rebuilds", status: kAudioHardwareUnspecifiedError), now: now)
+                reconcile()
+                return
+            }
+            log.notice("Rebuilding \(appID, privacy: .public): \(reason, privacy: .public)")
+            lastCallbackCounts[appID] = nil
+            // The device may be gone for good: plan with the devices there are now, which moves
+            // the output elsewhere if needed. Rebuild in place only if that didn't fix it.
+            reconcile()
+            guard let current = sessions[appID], current === session, session.isBroken || reason == Self.stallReason else {
+                return
+            }
+            do {
+                try session.switchOutput(to: session.outputDeviceUID)
+            } catch {
+                fail(appID, error, now: now)
+            }
+        }
+    }
+
+    /// While audio runs, checks every 2 s that each running session still renders. A stalled
+    /// session (its device stopped without a notification) is rebuilt.
+    private func updateWatchdog() {
+        let anyRunning = sessions.values.contains(where: \.isRunning)
+        if anyRunning, watchdog == nil {
+            let timer = DispatchSource.makeTimerSource(queue: queue)
+            timer.schedule(deadline: .now() + 2, repeating: 2, leeway: .milliseconds(250))
+            timer.setEventHandler { [weak self] in self?.checkStalls() }
+            timer.resume()
+            watchdog = timer
+        } else if !anyRunning, let timer = watchdog {
+            timer.cancel()
+            watchdog = nil
+            lastCallbackCounts = [:]
+        }
+    }
+
+    private func checkStalls() {
+        for (appID, session) in sessions where session.isRunning {
+            let count = session.callbackCount
+            if let last = lastCallbackCounts[appID], last == count {
+                scheduleRebuild(appID, reason: Self.stallReason)
+            }
+            lastCallbackCounts[appID] = count
+        }
+    }
+
     private func fail(_ appID: String, _ error: Error, now: Double) {
         log.error("\(appID, privacy: .public): \(String(describing: error), privacy: .public)")
-        sessions.removeValue(forKey: appID)?.destroy()
+        release(appID)
         failedUntil[appID] = now + Self.failureBackoff
     }
 
     private func destroyAll() {
-        for session in sessions.values {
-            session.destroy()
+        for appID in Array(sessions.keys) {
+            release(appID)
         }
-        sessions = [:]
     }
 
     /// Re-plans when a session's grace period at 100 % ends.

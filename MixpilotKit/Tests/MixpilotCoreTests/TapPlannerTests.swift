@@ -107,14 +107,26 @@ struct TapPlannerTests {
         #expect(start == [.start(appID: "com.spotify.client")])
     }
 
-    @Test func deviceChangeRebuildsTheSession() {
+    @Test func deviceChangeMovesTheOutputAndKeepsTheTap() {
         let moved = target(gain: 0.5, device: "AirPods")
         let actions = TapPlanner.plan(
             targets: [moved],
             sessions: ["com.spotify.client": session(gain: 0.5)],
             now: 0
         )
-        #expect(actions == [.destroy(appID: "com.spotify.client"), .create(moved)])
+        #expect(actions == [.setOutput(appID: "com.spotify.client", deviceUID: "AirPods")])
+    }
+
+    @Test func deviceChangeAndGainChangeTogether() {
+        let actions = TapPlanner.plan(
+            targets: [target(gain: 0.2, device: "AirPods")],
+            sessions: ["com.spotify.client": session(gain: 0.5)],
+            now: 0
+        )
+        #expect(actions == [
+            .setOutput(appID: "com.spotify.client", deviceUID: "AirPods"),
+            .setGain(appID: "com.spotify.client", gain: 0.2),
+        ])
     }
 
     @Test func deviceChangeAtFullVolumeOnlyRemoves() {
@@ -147,11 +159,19 @@ struct TapPlannerTests {
     }
 }
 
-@Suite("App volume")
-struct AppVolumeTests {
-    @Test func gainFollowsMute() {
-        #expect(AppVolume(volume: 0.7).gain == 0.7)
-        #expect(AppVolume(volume: 0.7, isMuted: true).gain == 0)
-        #expect(AppVolume.unchanged.gain == 1)
+
+@Suite("Planning taps: output devices")
+struct TapRoutingTests {
+    @Test func reroutedAppAtFullVolumeIsTapped() {
+        let target = TapTarget(appID: "net.whatsapp.WhatsApp", processObjectIDs: [5], gain: 1, isPlaying: true,
+                               outputDeviceUID: "AirPods", isRerouted: true)
+        #expect(TapPlanner.plan(targets: [target], sessions: [:], now: 0) == [.create(target)])
+    }
+
+    @Test func reroutedSessionSurvivesTheGracePeriodAtFullVolume() {
+        let target = TapTarget(appID: "net.whatsapp.WhatsApp", processObjectIDs: [5], gain: 1, isPlaying: true,
+                               outputDeviceUID: "AirPods", isRerouted: true)
+        let session = TapSessionState(processObjectIDs: [5], outputDeviceUID: "AirPods", gain: 1, isRunning: true, unitySince: 0)
+        #expect(TapPlanner.plan(targets: [target], sessions: ["net.whatsapp.WhatsApp": session], now: 100).isEmpty)
     }
 }

@@ -17,12 +17,12 @@ Mixpilot/                    App target (UI and wiring only), folder-synchronize
   MenuBar/                   MixerPanel (the window-style menu bar extra), AppRow, MenuBarIcon
   Resources/                 Localizable.xcstrings, InfoPlist.xcstrings, AppIcon.icon
 MixpilotKit/                 Swift package, no UI
-  Sources/MixpilotCore/      Pure logic, fully tested: AppGrouper, Linger, AppVolume, TapPlanner
-                             (later: settings store, call detector)
+  Sources/MixpilotCore/      Pure logic, fully tested: AppGrouper, Linger, AppAudioSettings,
+                             AppSettingsStore, OutputDevice (+ kind), TapPlanner (later: call detector)
   Sources/MixpilotRender/    C: the audio thread's code (MPRenderIOProc, gain ramp, soft limiter)
-  Sources/MixpilotAudio/     Core Audio HAL: HAL helpers, ProcessMonitor, Responsibility (private SPI),
-                             AudioDevices, TapSession, TapManager
-  Tests/MixpilotCoreTests/   Swift Testing: grouping, linger, tap planning
+  Sources/MixpilotAudio/     Core Audio HAL: HAL helpers, ProcessMonitor, DeviceMonitor, Responsibility
+                             (private SPI), AudioDevices, TapSession (+ Output), TapManager
+  Tests/MixpilotCoreTests/   Swift Testing: grouping, linger, tap planning, settings storage, device kinds
   Tests/MixpilotRenderTests/ Swift Testing against the C kernel with synthetic buffers
 Localization/                de.py (German table, source of truth) + localize.py (sync + fill + check)
 scripts/                     build.sh, run.sh, snapshots.sh, debug-volume.swift (set an app's volume in
@@ -60,16 +60,32 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
 - **Apps you haven't touched are never tapped**: no added latency, no risk. A session exists while
   the app's gain ≠ 1, plus 3 s after it returns to 1 (`TapPlanner.unityGrace`) so dragging through
   100 % doesn't rebuild it.
-- **TapSession**: `CATapDescription(stereoMixdownOfProcesses:)` over all the app's process objects,
-  private, `.mutedWhenTapped`; private aggregate device (main sub-device = the device the app plays to,
-  tap with drift compensation); wait until its streams exist; `AudioDeviceCreateIOProcID` with the C
+- **TapSession** = one tap for the session's whole life + a replaceable `Output`.
+  Tap: `CATapDescription(stereoMixdownOfProcesses:)` over all the app's process objects, private,
+  `.mutedWhenTapped`. Output: private aggregate device (main sub-device = the output device, the tap
+  with drift compensation), wait until its streams exist, `AudioDeviceCreateIOProcID` with the C
   `MPRenderIOProc` and an opaque `MPRenderState*` (C11 atomics: target gain, signal flag, callback
-  count). Teardown order: stop → destroy IOProc → destroy aggregate → destroy tap → free state.
+  count). Output teardown: stop → destroy IOProc → destroy aggregate → free state; tap last.
+- **Switching devices** (`setOutput`) is make-before-break: the new output starts, then the old one is
+  destroyed, so the app is never heard unmuted on its own device in between.
 - **IO follows the app's stream**: audio runs only while the app has an open output stream
   (`start`/`stop` actions), so Mixpilot never keeps a device (AirPods) streaming silence.
   New helper processes are added by rewriting `kAudioTapPropertyDescription` (no gap).
-- **Output device**: the device the app plays to (`kAudioProcessPropertyDevices`, output scope), else
-  the system default. If it changes (headphones, default switched), the session is rebuilt there.
+- **Output device**: the chosen device (`AppAudioSettings.outputDeviceUID`) while it is connected,
+  else the device the app plays to (`kAudioProcessPropertyDevices`, output scope), else the system
+  default. A chosen device makes the app "rerouted": tapped even at 100 %. When it disconnects, the
+  app follows the system again; when it reconnects, the choice applies again (UIDs are stable).
+- **Device health**: listeners on the aggregate, the output device (IsAlive, nominal sample rate) and
+  the tap format only *trigger a check*; the output is rebuilt (in place, keeping the tap) only when a
+  device is gone or not alive, after re-planning (which may move it elsewhere). A 2 s watchdog
+  rebuilds an output whose callback count stopped growing. More than 3 rebuilds in 10 s → release
+  the app for 10 s.
+- **Saved settings**: `AppSettingsStore` keeps volume, mute and chosen device (+ its name, to show
+  "AirPods Pro (Not Connected)") per bundle ID as JSON in UserDefaults (`appAudioSettings.v1`).
+  Unchanged apps and `pid:` IDs aren't stored; loading is lenient (bad values repaired or dropped).
+  Settings apply as soon as the app shows up in Core Audio again.
+- **Volume**: 0–200 %. The kernel's soft limiter bends samples above 0.9 when gain > 1. Values within
+  3 % of 100 % snap to 100 % (releases the tap). macOS 26+: `SliderTick(1.0)`; earlier: plain slider.
 - **Fail open**: on any error the session is destroyed and the app is blocked for 10 s;
   `.mutedWhenTapped` then gives the app its sound back. Permission: 2 s after a start with only
   silence, rewrite the tap description; `kAudioDevicePermissionsError` → release everything, show the
@@ -141,6 +157,14 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
 - Privacy pane URL: `x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture`
   opens "Screen & System Audio Recording" (Mixpilot is under "System Audio Recording Only").
 - Swift: `AudioBufferList.allocate(maximumBuffers: 0)` traps; allocate 1 and set `count = 0`.
+- **Destroying a tap and creating a new one for the same processes right away blocks ~1.3 s and
+  returns noErr with tap ID 0** (macOS 27). Hence: device switches/rebuilds keep the tap, the
+  manager waits 1.5 s (`recreateDelay`) after releasing an app before tapping it again, and a tap ID
+  of 0 is treated as an error.
+- A new aggregate device sends IsAlive / sample-rate notifications while it settles: never rebuild on
+  a notification alone, check the actual state (`isBroken`), or rebuilds loop.
+- Apple's wording for following the system output is "Use System Setting" (FaceTime's Video menu);
+  German "Systemeinstellung verwenden".
 
 ## Build, run, test
 
@@ -156,7 +180,11 @@ ProcessMonitor ──► [ProcessSnapshot] ──► AppGrouper (helpers → own
 - Logs: `log stream --level info --predicate 'subsystem == "app.mixpilot.mac"'` (category `taps`
   shows every session created, paused, resumed, released).
 - Without the panel (debug build): `swiftc -O scripts/debug-volume.swift -o build/debug-volume`, then
-  `build/debug-volume com.apple.QuickTimePlayerX 0.3` (or `mute` / `unmute`).
+  `build/debug-volume com.apple.QuickTimePlayerX 0.3` (0…2, `mute`, `unmute`,
+  `device <UID>`, `device system`). Device UIDs: `system_profiler SPAudioDataType` doesn't show them;
+  the debug log shows `Tapping … on <UID>`.
+- Saved settings: `defaults read app.mixpilot.mac appAudioSettings.v1` (JSON data);
+  `defaults delete app.mixpilot.mac appAudioSettings.v1` resets them.
 
 ## Conventions
 
@@ -190,6 +218,6 @@ Like Handpilot's `scripts/release-mac.sh`: archive → export developer-id → D
 
 1. ✅ List apps producing audio, live updating, in a native menu bar panel.
 2. ✅ Per-app volume and mute with process taps, clean teardown.
-3. Boost above 100 %, per-app output device, saved settings.
+3. ✅ Boost above 100 %, per-app output device, saved settings, device-change handling.
 4. Call detection and automatic lowering, microphone section.
 5. Shortcuts, launch at login, settings window, onboarding, full English and German, app icon.

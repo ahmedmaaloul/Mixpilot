@@ -7,20 +7,30 @@ public struct TapTarget: Sendable, Equatable {
     public var gain: Double
     /// The app has an open output stream. Mixpilot only runs audio while it does.
     public var isPlaying: Bool
-    /// The device the app plays to (its own choice, or the system default).
+    /// The device the app's sound should come out of.
     public var outputDeviceUID: String
+    /// The person chose another device than the one the app plays to on its own.
+    public var isRerouted: Bool
 
-    public init(appID: String, processObjectIDs: [UInt32], gain: Double, isPlaying: Bool, outputDeviceUID: String) {
+    public init(
+        appID: String,
+        processObjectIDs: [UInt32],
+        gain: Double,
+        isPlaying: Bool,
+        outputDeviceUID: String,
+        isRerouted: Bool = false
+    ) {
         self.appID = appID
         self.processObjectIDs = processObjectIDs
         self.gain = gain
         self.isPlaying = isPlaying
         self.outputDeviceUID = outputDeviceUID
+        self.isRerouted = isRerouted
     }
 
-    /// Whether the app needs Mixpilot at all. Apps at 100 % are never tapped.
+    /// Whether the app needs Mixpilot at all. Apps at 100 % on their own device are never tapped.
     public var needsTap: Bool {
-        gain != 1
+        gain != 1 || isRerouted
     }
 }
 
@@ -49,6 +59,8 @@ public enum TapAction: Sendable, Equatable {
     case destroy(appID: String)
     case setGain(appID: String, gain: Double)
     case setProcesses(appID: String, processObjectIDs: [UInt32])
+    /// Play the app on another device, keeping its tap.
+    case setOutput(appID: String, deviceUID: String)
     case start(appID: String)
     case stop(appID: String)
 }
@@ -88,12 +100,13 @@ public enum TapPlanner {
             }
 
             if session.outputDeviceUID != target.outputDeviceUID {
-                // The app moved to another device: rebuild there (or just stop if it's at 100 %).
-                actions.append(.destroy(appID: target.appID))
-                if target.needsTap && !blocked.contains(target.appID) {
-                    actions.append(.create(target))
+                guard target.needsTap else {
+                    // Back on the app's own device at 100 %: nothing left to do.
+                    actions.append(.destroy(appID: target.appID))
+                    continue
                 }
-                continue
+                // The app or the person picked another device: move the output, keep the tap.
+                actions.append(.setOutput(appID: target.appID, deviceUID: target.outputDeviceUID))
             }
 
             if !target.needsTap, let since = session.unitySince, now - since >= unityGrace {
